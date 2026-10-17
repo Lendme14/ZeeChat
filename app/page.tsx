@@ -36,6 +36,10 @@ export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [bioDraft, setBioDraft] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const reel = sampleReels[index];
@@ -94,6 +98,31 @@ export default function HomePage() {
       setNotice("You have signed out.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not sign out. Please try again.");
+    }
+  }
+
+  function openProfileEditor() {
+    setDisplayNameDraft(profile?.display_name ?? "");
+    setBioDraft(profile?.bio ?? "");
+    setEditProfileOpen(true);
+  }
+
+  async function saveProfile() {
+    if (!userId) { setNotice("Sign in to edit your profile."); return; }
+    const displayName = displayNameDraft.trim();
+    const bio = bioDraft.trim();
+    if (!displayName) { setNotice("Please enter a display name."); return; }
+    setProfileSaving(true);
+    try {
+      const { data, error } = await createClient().from("zeechat_profiles").update({ display_name: displayName, bio: bio || null }).eq("user_id", userId).select("username,display_name,bio").single();
+      if (error) throw error;
+      setProfile(data as ProfileSummary);
+      setEditProfileOpen(false);
+      setNotice("Profile updated.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not update your profile.");
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -189,9 +218,10 @@ export default function HomePage() {
       {view === "Discover" && <section className="content-view"><span className="eyebrow">YOUR NEXT FAVOURITE THING</span><h1>Find your <em>people.</em></h1><p>Creators, conversations and little adventures picked for your vibe.</p><div className="feature-grid">{[["😂","Make us laugh","Jump into today's comedy challenge."],["🎧","Music heads","Find people who love the same sounds."],["🎮","Play something","Fast games, friendly chaos."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("Discovery recommendations are currently preview content.")}>Explore ↗</button></article>)}</div></section>}
       {view === "Play" && <section className="content-view"><span className="eyebrow">BOREDOM DOESN'T LIVE HERE</span><h1>Let's <em>play.</em></h1><p>Little games, big laughs, and people to share them with.</p><div className="feature-grid">{[["🧠","Quickfire Trivia","5 questions. How sharp are you?"],["😂","Caption This","Make the funniest caption win."],["🎤","Voice Room Roulette","Meet people around shared interests."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("This activity is a UI preview; scoring and rewards are not yet connected.")}>Join activity ↗</button></article>)}</div></section>}
       {view === "Chats" && <section className="content-view"><span className="eyebrow">KEEP THE VIBE GOING</span><h1>Your <em>conversations.</em></h1><p>Good chats turn into great memories.</p><div className="empty-state"><MessageCircle size={34}/><h3>Good conversations start here.</h3><p>Secure real-time messaging is planned for a later implementation pass.</p></div></section>}
-      {view === "Profile" && <section className="content-view"><div className="profile-cover"><span>✦ GOOD ENERGY ONLY</span></div><div className="profile-summary"><div className="profile-avatar">C</div>{userId ? <button className="outline-button" onClick={() => void signOut()}>Sign out</button> : <a href="/login" className="outline-button">Sign in</a>}<h1>{userId ? (profile?.display_name || profile?.username || (userEmail ? userEmail.split("@")[0] : "Your ZeeChat profile")) : "Your ZeeChat profile"}</h1><p>{userId ? (profile?.username ? `@${profile.username}` : "You’re signed in. Your profile is being set up.") : "Sign in to make this profile yours."}</p>{userId && profile?.bio && <p>{profile.bio}</p>}<div className="profile-stats"><div><b>—</b><small>Followers</small></div><div><b>—</b><small>Following</small></div><div><b>{posts.length}</b><small>Posts loaded</small></div><div><b>—</b><small>Likes</small></div></div></div></section>}
+      {view === "Profile" && <section className="content-view"><div className="profile-cover"><span>✦ GOOD ENERGY ONLY</span></div><div className="profile-summary"><div className="profile-avatar">C</div>{userId ? <button className="outline-button" onClick={openProfileEditor}>Edit profile</button> : <a href="/login" className="outline-button">Sign in</a>}<h1>{userId ? (profile?.display_name || profile?.username || (userEmail ? userEmail.split("@")[0] : "Your ZeeChat profile")) : "Your ZeeChat profile"}</h1><p>{userId ? (profile?.username ? `@${profile.username}` : "You’re signed in. Your profile is being set up.") : "Sign in to make this profile yours."}</p>{userId && profile?.bio && <p>{profile.bio}</p>}<div className="profile-stats"><div><b>—</b><small>Followers</small></div><div><b>—</b><small>Following</small></div><div><b>{posts.length}</b><small>Posts loaded</small></div><div><b>—</b><small>Likes</small></div></div></div></section>}
     </section>
     <nav className="mobile-nav">{nav.map(({name,icon:Icon})=><button key={name} className={view === name ? "active" : ""} onClick={() => setView(name)}><Icon size={19}/><span>{name}</span></button>)}</nav>
+    {editProfileOpen && <div className="modal-backdrop" onClick={() => setEditProfileOpen(false)}><section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setEditProfileOpen(false)}>×</button><span className="eyebrow">MAKE IT YOURS</span><h2 id="edit-profile-title">Edit your <em>profile.</em></h2><form onSubmit={event => { event.preventDefault(); void saveProfile(); }}><label>Display name<input value={displayNameDraft} onChange={event => setDisplayNameDraft(event.target.value)} maxLength={60} required /></label><label>Bio<textarea value={bioDraft} onChange={event => setBioDraft(event.target.value)} maxLength={300} placeholder="A little about you…" /></label><div className="modal-footer"><small>{bioDraft.length}/300</small><button className="create-button" type="submit" disabled={profileSaving || !displayNameDraft.trim()}>{profileSaving ? "Saving…" : "Save profile ↗"}</button></div></form></section></div>}
     {createOpen && <div className="modal-backdrop" onClick={() => setCreateOpen(false)}><section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCreateOpen(false)}>×</button><span className="eyebrow">YOUR VOICE, YOUR SPACE</span><h2 id="create-title">Share a little <em>something.</em></h2><p>Text posts are live. Photo and video publishing will be added next.</p><textarea value={caption} onChange={e => setCaption(e.target.value)} maxLength={2200} placeholder="What's the vibe today?" /><div className="modal-footer"><small>{caption.length}/2200</small><button className="create-button" disabled={busy || !caption.trim()} onClick={publish}>{busy ? "Publishing…" : "Publish post ↗"}</button></div></section></div>}
   </main>;
 }
