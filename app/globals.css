@@ -84,3 +84,20 @@ button{touch-action:manipulation}
   .action-circle{width:36px;height:36px}
   .reel-caption{padding-left:11px;padding-right:11px}
 }
+
+
+/* Native-feeling touch and immersive mobile navigation */
+@media(max-width:600px){
+  html,body{overflow-x:hidden;overscroll-behavior-x:none}
+  .reel-player{touch-action:pan-y;outline:none}
+  .reel-player:focus-visible{box-shadow:0 0 0 2px var(--pink)}
+  .reel-actions button,.mobile-nav button,.feed-tabs button,.reel-switcher button{transition:transform .16s ease,color .16s ease,background .16s ease}
+  .reel-actions button:active,.mobile-nav button:active,.feed-tabs button:active,.reel-switcher button:active{transform:scale(.95)}
+  .mobile-nav button span{font-weight:650;letter-spacing:.05px}
+  .post-card,.feature-card,.empty-state{box-shadow:0 8px 26px #0002}
+  .comments-panel{background:#100e15}
+  .comment-form input{min-height:42px}
+  .comment-form button{min-width:58px}
+  .create-button,.outline-button,.follow-button{min-height:36px}
+  .notice{position:sticky;top:60px;z-index:7;box-shadow:0 8px 24px #0004}
+}
