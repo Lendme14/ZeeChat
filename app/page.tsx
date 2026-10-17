@@ -185,15 +185,19 @@ export default function HomePage() {
     if (!caption.trim() && !mediaFile) return;
     if (!userId) { setNotice("Sign in first to publish a post."); return; }
     setBusy(true);
+    const supabase = createClient();
+    let uploadedPath: string | null = null;
     try {
-      const supabase = createClient();
       let mediaUrl: string | null = null;
       if (mediaFile) {
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+        if (!allowedTypes.includes(mediaFile.type)) throw new Error("Choose a JPEG, PNG, WebP or GIF image.");
+        if (mediaFile.size > 8 * 1024 * 1024) throw new Error("Choose an image smaller than 8 MB.");
         const extension = mediaFile.name.split(".").pop()?.toLowerCase() || "jpg";
-        const objectPath = userId + "/" + crypto.randomUUID() + "." + extension;
-        const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(objectPath, mediaFile, { contentType: mediaFile.type, upsert: false });
+        uploadedPath = userId + "/" + crypto.randomUUID() + "." + extension;
+        const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(uploadedPath, mediaFile, { contentType: mediaFile.type, upsert: false });
         if (uploadError) throw uploadError;
-        mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(objectPath).data.publicUrl;
+        mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(uploadedPath).data.publicUrl;
       }
       const { error } = await supabase.from("zeechat_posts").insert({ author_id: userId, caption: caption.trim(), post_type: mediaFile ? "image" : "text", media_url: mediaUrl, visibility: "public" });
       if (error) throw error;
@@ -201,6 +205,7 @@ export default function HomePage() {
       const { data } = await supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url").eq("visibility", "public").order("created_at", { ascending: false }).limit(10);
       setPosts((data ?? []) as Post[]);
     } catch (error) {
+      if (uploadedPath) await supabase.storage.from("zeechat-media").remove([uploadedPath]).catch(() => undefined);
       setNotice(error instanceof Error ? error.message : "Could not publish. Check your connection and try again.");
     } finally { setBusy(false); }
   }
