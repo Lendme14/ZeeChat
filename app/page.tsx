@@ -45,11 +45,12 @@ export default function HomePage() {
           if (!loadedPosts.length) return;
           const { data: likes, error: likesError } = await supabase.from("zeechat_post_likes").select("post_id,user_id").in("post_id", loadedPosts.map(post => post.id));
           if (!active || likesError) return;
+          const { data: authData } = await supabase.auth.getUser();
           const counts: Record<string, number> = {};
           const mine: string[] = [];
           for (const like of likes ?? []) {
             counts[like.post_id] = (counts[like.post_id] ?? 0) + 1;
-            if (data?.[0] && like.user_id === (await supabase.auth.getUser()).data.user?.id) mine.push(like.post_id);
+            if (authData.user && like.user_id === authData.user.id) mine.push(like.post_id);
           }
           setPostLikeCounts(counts);
           setLikedPostIds(mine);
