@@ -242,3 +242,41 @@ body{background:#0b0f11;color:var(--text)}
   .post-nav-orbit{border-color:#f4f5f0}
   .mobile-nav .post-nav-button{color:#66716b}
 }
+
+
+/* Interaction finishing pass: motion, focus, scrolling and responsive surfaces */
+:root{scroll-behavior:smooth}
+body{font-feature-settings:"ss01" on,"cv11" on}
+button,a,input,textarea{outline-offset:3px}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #42dfb4}
+button:disabled{cursor:not-allowed;opacity:.58}
+.nav-link,.create-button,.outline-button,.feature-card,.post-card,.chat-inbox-empty,.icon-button,.follow-button,.action-circle,.mobile-nav button,.feed-tabs button{transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .24s ease,transform .24s cubic-bezier(.2,.8,.2,1)}
+.feature-card:hover,.post-card:hover{border-color:#38534b;box-shadow:0 18px 42px #0003;transform:translateY(-2px)}
+.create-button:hover,.chat-compose:hover{filter:brightness(1.06);transform:translateY(-1px)}
+.create-button:active,.outline-button:active,.follow-button:active,.icon-button:active{transform:scale(.97)}
+.reel-player{isolation:isolate;will-change:background-image}
+.reel-player.reel-enter{animation:reel-enter .38s cubic-bezier(.2,.75,.25,1) both}
+.reel-player.reel-enter .reel-caption{animation:reel-caption-enter .46s .04s cubic-bezier(.2,.75,.25,1) both}
+.reel-player.reel-enter .sound-button{animation:reel-controls-enter .35s .08s ease-out both}
+@keyframes reel-enter{from{opacity:.55;transform:scale(1.018)}to{opacity:1;transform:scale(1)}}
+@keyframes reel-caption-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes reel-controls-enter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.reel-progress span{transition:background-color .25s ease,opacity .25s ease}
+.action-circle{transition:transform .2s cubic-bezier(.2,.8,.2,1),background-color .2s ease,border-color .2s ease}
+.reel-actions button:active .action-circle{transform:scale(.9)}
+.mobile-nav button:active{transform:translateY(1px)}
+.modal-backdrop{animation:modal-backdrop-in .18s ease-out both}
+.create-modal{animation:modal-sheet-in .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes modal-backdrop-in{from{opacity:0}to{opacity:1}}
+@keyframes modal-sheet-in{from{opacity:0;transform:translateY(14px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:600px){
+  .immersive-reels .reel-player.reel-enter{animation:reel-enter .32s ease-out both}
+  .immersive-reels .reel-player.reel-enter .reel-caption{animation:reel-caption-enter .36s .03s ease-out both}
+  .main-column{overscroll-behavior-y:contain}
+  .mobile-nav{padding-bottom:max(5px,env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){
+  :root{scroll-behavior:auto}
+  .reel-player.reel-enter,.reel-player.reel-enter .reel-caption,.reel-player.reel-enter .sound-button,.modal-backdrop,.create-modal{animation:none!important}
+  .nav-link,.create-button,.outline-button,.feature-card,.post-card,.chat-inbox-empty,.icon-button,.follow-button,.action-circle,.mobile-nav button,.feed-tabs button{transition:none!important}
+}
