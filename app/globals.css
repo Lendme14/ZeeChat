@@ -101,3 +101,46 @@ button{touch-action:manipulation}
   .create-button,.outline-button,.follow-button{min-height:36px}
   .notice{position:sticky;top:60px;z-index:7;box-shadow:0 8px 24px #0004}
 }
+
+
+/* Full-screen, edge-to-edge Reels inspired by the user's reference */
+.immersive-reel-header,.reel-progress{display:none}
+@media(max-width:600px){
+  .main-column:has(.immersive-reels){padding:0!important}
+  .topbar.reels-topbar{display:none}
+  .immersive-reels{position:fixed;inset:0;z-index:4;width:100%;height:100dvh;height:100svh;max-width:none;margin:0!important;padding:0;background:#050505;overflow:hidden}
+  .immersive-reels .section-heading,.immersive-reels .reel-switcher,.immersive-reels .live-feed{display:none}
+  .immersive-reels .reel-layout{position:absolute;inset:0;display:block;margin:0;width:100%;height:100%;max-width:none}
+  .immersive-reels .reel-player{position:absolute;inset:0 0 calc(62px + env(safe-area-inset-bottom));width:100%;height:auto;min-height:0;border:0;border-radius:0;background-position:center;background-size:cover;box-shadow:none}
+  .immersive-reels .reel-player::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0009 0%,transparent 23%,transparent 48%,#0002 62%,#000b 100%);pointer-events:none}
+  .immersive-reels .immersive-reel-header{position:absolute;top:max(18px,env(safe-area-inset-top));left:18px;right:18px;z-index:2;display:flex;align-items:center;justify-content:space-between}
+  .immersive-brand{display:flex;align-items:center;gap:10px;padding:9px 15px 9px 9px;border-radius:30px;background:#0808089c;color:#fff;font-family:Georgia,serif;font-size:22px;font-weight:700;letter-spacing:-.5px}
+  .immersive-brand b{font-weight:400}
+  .immersive-brand-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:#fff;color:#164e42;font-family:Arial,sans-serif;font-size:23px}
+  .immersive-search{width:58px;height:58px;display:grid;place-items:center;border:1px solid #ffffff30;border-radius:50%;background:#08080872;color:white}
+  .immersive-reels .reel-progress{position:absolute;top:calc(max(18px,env(safe-area-inset-top)) + 78px);left:18px;right:18px;z-index:2;display:flex;gap:5px}
+  .reel-progress span{height:5px;flex:1;border-radius:9px;background:#ffffff65}
+  .reel-progress span.current{background:#fff}
+  .reel-progress span.completed{background:#fff}
+  .immersive-reels .reel-top-tag{display:none}
+  .immersive-reels .sound-button{top:calc(max(18px,env(safe-area-inset-top)) + 96px);right:18px;width:38px;height:38px;z-index:2;background:#08080866}
+  .immersive-reels .reel-caption{z-index:2;left:20px;right:82px;bottom:22px;padding:20px 0 15px;background:linear-gradient(0deg,#0008,transparent)}
+  .immersive-reels .creator-row{gap:10px}
+  .immersive-reels .creator-avatar{width:43px;height:43px;font-size:17px;border:1px solid #ffffff55}
+  .immersive-reels .creator-row b{font-size:15px}
+  .immersive-reels .creator-row small{font-size:11px}
+  .immersive-reels .follow-button{padding:7px 13px;min-height:34px;border-radius:999px;background:#ffffff16;border-color:#ffffff75;font-size:12px}
+  .immersive-reels .reel-caption p{font-size:16px;line-height:1.45;margin:15px 0 8px}
+  .immersive-reels .reel-caption strong{font-size:13px}
+  .immersive-reels .sound-line{font-size:12px;margin-top:12px}
+  .immersive-reels .reel-actions{position:absolute;right:13px;bottom:calc(94px + env(safe-area-inset-bottom));z-index:3;display:grid;gap:19px;justify-items:center;padding:0}
+  .immersive-reels .reel-actions button{gap:6px;font-size:11px;color:white;text-shadow:0 1px 4px #000}
+  .immersive-reels .action-circle{width:54px;height:54px;border-radius:50%;background:#08080845;border:1px solid #ffffff55;box-shadow:none}
+  .immersive-reels .action-circle svg{width:24px;height:24px}
+  .immersive-reels .reel-actions .liked .action-circle{background:#df174e4a;border-color:#ff7195;color:#ff3167}
+  .mobile-nav{z-index:8;height:calc(62px + env(safe-area-inset-bottom));padding:7px 7px calc(5px + env(safe-area-inset-bottom));background:#f0eee8;border-top:0;backdrop-filter:none}
+  .mobile-nav button{color:#626760;min-height:48px;font-size:10px}
+  .mobile-nav button.active{color:#284c43}
+  .mobile-nav button.active::before{display:none}
+  .mobile-nav svg{width:23px;height:23px}
+}
