@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type View = "Reels" | "Discover" | "Play" | "Chats" | "Profile";
 type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; };
+type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 type ProfileSummary = { username: string; display_name: string; bio: string | null; };
 const sampleReels = [
@@ -30,6 +31,7 @@ export default function HomePage() {
   const [caption, setCaption] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [postAuthors, setPostAuthors] = useState<Record<string, PostAuthor>>({});
   const [postLikeCounts, setPostLikeCounts] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
   const [likeBusyIds, setLikeBusyIds] = useState<string[]>([]);
@@ -94,6 +96,13 @@ export default function HomePage() {
           const loadedPosts = (data ?? []) as Post[];
           setPosts(loadedPosts);
           if (!loadedPosts.length) return;
+          const authorIds = [...new Set(loadedPosts.map(post => post.author_id))];
+          const { data: authorProfiles } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", authorIds);
+          if (active && authorProfiles) {
+            const authorMap: Record<string, PostAuthor> = {};
+            for (const author of authorProfiles) authorMap[author.user_id] = { username: author.username, display_name: author.display_name, avatar_url: author.avatar_url };
+            setPostAuthors(authorMap);
+          }
           const { data: likes, error: likesError } = await supabase.from("zeechat_post_likes").select("post_id,user_id").in("post_id", loadedPosts.map(post => post.id));
           if (!active || likesError) return;
           const { data: authData } = await supabase.auth.getUser();
@@ -232,7 +241,17 @@ export default function HomePage() {
       if (error) throw error;
       setCaption(""); setMediaFile(null); setCreateOpen(false); setNotice("Your post is live!");
       const { data } = await supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url").eq("visibility", "public").order("created_at", { ascending: false }).limit(10);
-      setPosts((data ?? []) as Post[]);
+      const refreshedPosts = (data ?? []) as Post[];
+      setPosts(refreshedPosts);
+      const authorIds = [...new Set(refreshedPosts.map(post => post.author_id))];
+      if (authorIds.length) {
+        const { data: authorProfiles } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", authorIds);
+        if (authorProfiles) {
+          const authorMap: Record<string, PostAuthor> = {};
+          for (const author of authorProfiles) authorMap[author.user_id] = { username: author.username, display_name: author.display_name, avatar_url: author.avatar_url };
+          setPostAuthors(authorMap);
+        }
+      }
     } catch (error) {
       if (uploadedPath) await supabase.storage.from("zeechat-media").remove([uploadedPath]).catch(() => undefined);
       setNotice(error instanceof Error ? error.message : "Could not publish. Check your connection and try again.");
@@ -256,7 +275,7 @@ export default function HomePage() {
           <div className="reel-caption"><div className="creator-row"><span className="creator-avatar">{reel.initial}</span><div><b>{reel.user} <ShieldCheck size={13}/></b><small>Creator · 2h ago</small></div><button className="follow-button" onClick={() => setFollowing(a => a.includes(index) ? a.filter(x => x !== index) : [...a, index])}>{following.includes(index) ? "Following" : "Follow +"}</button></div><p>{reel.caption}</p><strong>{reel.tags}</strong><small className="sound-line">♫ &nbsp;{reel.sound}</small></div>
         </div><div className="reel-actions"><button onClick={() => setLiked(a => a.includes(index) ? a.filter(x => x !== index) : [...a, index])} className={liked.includes(index) ? "liked" : ""}><span className="action-circle"><Heart size={22} fill={liked.includes(index) ? "currentColor" : "none"}/></span><b>{liked.includes(index) ? "24.9K" : reel.likes}</b></button><button onClick={() => setNotice("Comments will be connected to live posts in the next pass.")}><span className="action-circle"><MessageCircle size={22}/></span><b>{reel.comments}</b></button><button onClick={() => setNotice("Sharing is coming soon.")}><span className="action-circle"><Send size={20}/></span><b>Share</b></button></div></div>
         <div className="reel-switcher"><button disabled={index === 0} onClick={() => setIndex(i => i - 1)}>↑ Previous</button><span>{index + 1} / {sampleReels.length}</span><button disabled={index === sampleReels.length - 1} onClick={() => setIndex(i => i + 1)}>Next ↓</button></div>
-        <section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id}><div className="post-avatar">z</div><div className="post-body"><b>Community post</b><small>{new Date(p.created_at).toLocaleString()}</small>{p.caption && <p>{p.caption}</p>}{p.media_url && <Image className="community-post-image" src={p.media_url} alt="Image shared in a ZeeChat post" width={1200} height={900} sizes="(max-width: 640px) 100vw, 720px" />}<div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small><p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">Live text posts will show up here when people start sharing.</p>}</section>
+        <section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id}><div className="post-avatar">{postAuthors[p.author_id]?.avatar_url ? <Image src={postAuthors[p.author_id].avatar_url!} alt="" width={42} height={42} /> : (postAuthors[p.author_id]?.display_name?.[0] || postAuthors[p.author_id]?.username?.[0] || "z").toUpperCase()}</div><div className="post-body"><b>{postAuthors[p.author_id]?.display_name || postAuthors[p.author_id]?.username || "ZeeChat member"} <span className="post-username">{postAuthors[p.author_id]?.username ? `@${postAuthors[p.author_id].username}` : ""}</span></b><small>{new Date(p.created_at).toLocaleString()}</small>{p.caption && <p>{p.caption}</p>}{p.media_url && <Image className="community-post-image" src={p.media_url} alt="Image shared in a ZeeChat post" width={1200} height={900} sizes="(max-width: 640px) 100vw, 720px" />}<div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small><p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">Live text posts will show up here when people start sharing.</p>}</section>
       </section>}
       {view === "Discover" && <section className="content-view"><span className="eyebrow">YOUR NEXT FAVOURITE THING</span><h1>Find your <em>people.</em></h1><p>Creators, conversations and little adventures picked for your vibe.</p><div className="feature-grid">{[["😂","Make us laugh","Jump into today&apos;s comedy challenge."],["🎧","Music heads","Find people who love the same sounds."],["🎮","Play something","Fast games, friendly chaos."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("Discovery recommendations are currently preview content.")}>Explore ↗</button></article>)}</div></section>}
       {view === "Play" && <section className="content-view"><span className="eyebrow">BOREDOM DOESN&apos;T LIVE HERE</span><h1>Let&apos;s <em>play.</em></h1><p>Little games, big laughs, and people to share them with.</p><div className="feature-grid">{[["🧠","Quickfire Trivia","5 questions. How sharp are you?"],["😂","Caption This","Make the funniest caption win."],["🎤","Voice Room Roulette","Meet people around shared interests."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("This activity is a UI preview; scoring and rewards are not yet connected.")}>Join activity ↗</button></article>)}</div></section>}
