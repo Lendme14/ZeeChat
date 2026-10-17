@@ -193,3 +193,52 @@ button{touch-action:manipulation}
   .chat-inbox-empty{min-height:360px;padding:28px 17px;border-radius:19px}
   .chat-inbox-empty h2{font-size:20px}
 }
+
+
+/* ZeeChat visual system refresh: cleaner hierarchy, restrained color, less clutter */
+:root{--brand:#17c99a;--brand-strong:#0da980;--brand-ink:#062f25;--surface:#12171a;--surface-raised:#191f23;--stroke:#2a3337;--text:#f4f7f6;--muted:#9aa7a5;--pink:var(--brand);--purple:#8d9bff}
+body{background:#0b0f11;color:var(--text)}
+.app-shell{background:#0b0f11}
+.sidebar{background:#0d1214;border-right:1px solid #20292c}
+.brand-mark{background:linear-gradient(145deg,#28dfad,#0ba980);color:#052c22}
+.nav-link{border-radius:12px;color:#a4b0af}
+.nav-link.active{background:#142a25;color:#7ce8c7}
+.nav-link:hover{background:#17211f}
+.topbar{border-color:#20292c}
+.search{background:#12191b;border-color:#273235}
+.create-button,.auth-submit{background:linear-gradient(135deg,#20d5a5,#0da980);color:#042b21;border:0;font-weight:750}
+.content-view,.reels-view{max-width:1040px}
+.eyebrow{color:#55d8b3}
+.feature-card,.post-card,.empty-state{background:#121719;border-color:#263033}
+.feature-emoji{background:#1a2c28;border:1px solid #24493e;border-radius:16px}
+.outline-button,.follow-button{border-color:#3a514a;color:#9be9d0}
+.notice{background:#17241f;border-color:#2d5548;color:#d8fff1}
+.modal-backdrop{backdrop-filter:blur(12px)}
+.create-modal{background:#111719;border-color:#2a3739}
+.create-modal input,.create-modal textarea{background:#0b1113;border-color:#2c393b}
+.mobile-nav{background:#0e1415;border-top:1px solid #263033}
+.mobile-nav button.active{color:#49d9b0}
+.post-nav-orbit{background:linear-gradient(145deg,#31e0b0,#0ba980);color:#052c22}
+.chat-play-button{background:#142720;border-color:#285344;color:#9cf0d7}
+@media(max-width:600px){
+  .main-column{padding-left:0;padding-right:0}
+  .topbar{padding-inline:12px}
+  .immersive-reels{background:#06090a}
+  .immersive-reels .reel-player{inset:0 0 calc(68px + env(safe-area-inset-bottom));background-color:#06090a}
+  .immersive-reels .immersive-brand{font-family:Arial,sans-serif;font-size:19px;letter-spacing:-.8px;background:#07100db8;border:1px solid #ffffff1a}
+  .immersive-reels .immersive-brand-mark{background:#20d5a5;color:#062d22;font-weight:800}
+  .immersive-reels .immersive-search{width:44px;height:44px;background:#07100db8;border-color:#ffffff25}
+  .immersive-reels .reel-progress{top:calc(max(18px,env(safe-area-inset-top)) + 67px);left:16px;right:16px}
+  .immersive-reels .reel-progress span{height:3px}
+  .immersive-reels .sound-button{top:calc(max(18px,env(safe-area-inset-top)) + 81px);width:34px;height:34px}
+  .immersive-reels .reel-caption{left:16px;right:76px;bottom:17px}
+  .immersive-reels .creator-avatar{border-radius:50%;background:linear-gradient(145deg,#29dcb0,#0d8d71);color:#052b22}
+  .immersive-reels .follow-button{background:#102820;border-color:#4dd5af;color:#a3f2dc}
+  .immersive-reels .reel-actions{right:11px;bottom:calc(90px + env(safe-area-inset-bottom));gap:17px}
+  .immersive-reels .action-circle{width:46px;height:46px;background:#07100d88;border:1px solid #ffffff4a}
+  .mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr));background:#f4f5f0;color:#18211e;border-top:1px solid #dfe4de}
+  .mobile-nav button{color:#66716b}
+  .mobile-nav button.active{color:#087e61}
+  .post-nav-orbit{border-color:#f4f5f0}
+  .mobile-nav .post-nav-button{color:#66716b}
+}
