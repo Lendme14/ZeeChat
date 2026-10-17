@@ -280,3 +280,25 @@ button:disabled{cursor:not-allowed;opacity:.58}
   .reel-player.reel-enter,.reel-player.reel-enter .reel-caption,.reel-player.reel-enter .sound-button,.modal-backdrop,.create-modal{animation:none!important}
   .nav-link,.create-button,.outline-button,.feature-card,.post-card,.chat-inbox-empty,.icon-button,.follow-button,.action-circle,.mobile-nav button,.feed-tabs button{transition:none!important}
 }
+
+
+/* Search is a real navigation control, not a decorative input */
+.search-wrap{position:relative;flex:1;min-width:0;max-width:470px}
+.search-wrap .search{width:100%;max-width:none}
+.search-wrap .search:focus-within{border-color:#347f6a;box-shadow:0 0 0 3px #17c99a14}
+.search-results{position:absolute;z-index:30;top:calc(100% + 10px);left:0;right:0;padding:8px;border:1px solid #2b3a37;border-radius:17px;background:#101716;box-shadow:0 20px 55px #0008;backdrop-filter:blur(18px);animation:search-drop-in .16s ease-out both}
+.search-results>button:not(.search-dismiss){display:flex;align-items:center;gap:11px;width:100%;padding:11px;border:0;border-radius:11px;background:transparent;color:#eef7f3;text-align:left}
+.search-results>button:not(.search-dismiss):hover,.search-results>button:not(.search-dismiss):focus-visible{background:#1b2a25}
+.search-result-avatar{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:50%;background:linear-gradient(145deg,#27dcb0,#087e61);color:#042b21;font-weight:800}
+.search-result-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.search-result-copy b{font-size:12px}
+.search-result-copy small{overflow:hidden;color:#95a7a0;font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.search-result-type{color:#6fe3be;font-size:10px;font-weight:700}
+.search-results>p{margin:10px;padding:8px;color:#a8b7b1;font-size:12px}
+.search-results .search-dismiss{width:100%;padding:9px;border:0;border-top:1px solid #263430;background:transparent;color:#8faaa0;font-size:11px}
+@keyframes search-drop-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){
+ .search-wrap{max-width:none}
+ .search-results{max-height:min(55dvh,420px);overflow:auto}
+}
+@media(prefers-reduced-motion:reduce){.search-results{animation:none}}
