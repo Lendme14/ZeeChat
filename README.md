@@ -7,7 +7,7 @@ ZeeChat is a standalone social experience focused on discovery, creativity, and 
 - Reels-inspired responsive social interface
 - Discover, Play, Chats, and Profile preview views
 - Supabase email sign-up/sign-in page
-- Initial live text-post feed and composer
+- Live text and photo posts (JPEG, PNG, WebP, GIF up to 8 MB) with Supabase Storage
 - Additive ZeeChat-specific Supabase migration
 
 ## Setup
@@ -23,4 +23,4 @@ This starter has not yet passed a confirmed production build in the authoring en
 
 ## Scope notes
 
-Several screens and interactions are still previews. Live direct messaging, media uploads, game scoring, profile editing, and moderation workflows are not yet implemented. The Reels content currently includes sample content and local-only interactions.
+Several screens and interactions are still previews. Live direct messaging, video uploads, game scoring, and moderation workflows are not yet implemented. Photo uploads require the ZeeChat media-storage migration. The Reels content currently includes sample content and local-only interactions.
