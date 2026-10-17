@@ -32,3 +32,19 @@ The post feed filters for public posts and the post composer requires an authent
 - Implement persistent follows, direct messaging, media storage, and upload validation.
 - Review RLS policies and test them using separate user accounts.
 - Add tests for sign-up, sign-in, post creation, visibility, and unauthorised writes.
+
+
+## Railway deployment (without GitHub Actions)
+
+Railway can build and run this repository directly from its connected GitHub repository; GitHub Actions is not required.
+
+1. In Railway, create or open the ZeeChat service and connect `Lendme14/ZeeChat` on the intended branch (normally `main`).
+2. Set these service variables in Railway's Variables panel:
+   - `NEXT_PUBLIC_SUPABASE_URL` — the ZeeChat Supabase project URL.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — the project's publishable/anon key.
+3. Use Node.js 20 or newer. The repository scripts are `npm run build` and `npm run start`; Railway should build with the build script and start with the start script. If the service does not detect them automatically, set the build command to `npm run build` and the start command to `npm run start`.
+4. Deploy and inspect the service's **Build Logs** first, then **Deploy Logs**. A successful build alone does not prove Supabase sign-up, RLS, or posting works.
+5. In Supabase Authentication settings, add the deployed Railway URL to the allowed Site URL / redirect URLs as appropriate. Test sign-up, sign-in, publishing a text post, liking it, and commenting with two separate test accounts.
+6. Keep secrets out of Git. Only the public/publishable Supabase key belongs in `NEXT_PUBLIC_*` variables; never put a Supabase service-role key in client-visible variables.
+
+Do not create a GitHub Actions workflow for this project. Railway's own build/deploy pipeline is separate from GitHub Actions.
