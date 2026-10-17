@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Bell, Compass, Film, Gamepad2, Heart, LogOut, MessageCircle, Plus, Search, Send, ShieldCheck, Sparkles, UserRound, VolumeX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +21,8 @@ const nav: { name: View; icon: typeof Film }[] = [
 export default function HomePage() {
   const [view, setView] = useState<View>("Reels");
   const [index, setIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
   const [liked, setLiked] = useState<number[]>([]);
   const [following, setFollowing] = useState<number[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -45,6 +47,26 @@ export default function HomePage() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const reel = sampleReels[index];
+
+  function handleReelTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    touchStartX.current = event.changedTouches[0]?.clientX ?? null;
+    touchStartY.current = event.changedTouches[0]?.clientY ?? null;
+  }
+
+  function handleReelTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    const startX = touchStartX.current;
+    const startY = touchStartY.current;
+    const endX = event.changedTouches[0]?.clientX;
+    const endY = event.changedTouches[0]?.clientY;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (startX === null || startY === null || endX === undefined || endY === undefined) return;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      setIndex(current => dx < 0 ? (current + 1) % sampleReels.length : (current - 1 + sampleReels.length) % sampleReels.length);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -223,7 +245,7 @@ export default function HomePage() {
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {view === "Reels" && <section className="reels-view">
         <div className="section-heading"><div><span className="eyebrow">YOUR DAILY DOSE OF FUN</span><h1>Catch a <em>vibe.</em></h1></div><div className="feed-tabs"><button>Following</button><button className="selected">For you</button><button>Live <i className="live-dot"/></button></div></div>
-        <div className="reel-layout"><div className="reel-player" style={{ backgroundImage: `linear-gradient(0deg,#08070ddf,transparent 55%,#08070d55),url(https://images.unsplash.com/${reel.image}?auto=format&fit=crop&w=1000&q=85)` }}>
+        <div className="reel-layout"><div className="reel-player" onTouchStart={handleReelTouchStart} onTouchEnd={handleReelTouchEnd} onKeyDown={event => { if (event.key === "ArrowDown") setIndex(current => (current + 1) % sampleReels.length); if (event.key === "ArrowUp") setIndex(current => (current - 1 + sampleReels.length) % sampleReels.length); }} tabIndex={0} aria-label="Reel viewer. Swipe horizontally to change videos." style={{ backgroundImage: `linear-gradient(0deg,#08070ddf,transparent 55%,#08070d55),url(https://images.unsplash.com/${reel.image}?auto=format&fit=crop&w=1000&q=85)` }}>
           <div className="reel-top-tag"><Sparkles size={13}/> MADE FOR YOUR MOOD</div><button className="sound-button" aria-label="Sound muted"><VolumeX size={18}/></button>
           <div className="reel-caption"><div className="creator-row"><span className="creator-avatar">{reel.initial}</span><div><b>{reel.user} <ShieldCheck size={13}/></b><small>Creator · 2h ago</small></div><button className="follow-button" onClick={() => setFollowing(a => a.includes(index) ? a.filter(x => x !== index) : [...a, index])}>{following.includes(index) ? "Following" : "Follow +"}</button></div><p>{reel.caption}</p><strong>{reel.tags}</strong><small className="sound-line">♫ &nbsp;{reel.sound}</small></div>
         </div><div className="reel-actions"><button onClick={() => setLiked(a => a.includes(index) ? a.filter(x => x !== index) : [...a, index])} className={liked.includes(index) ? "liked" : ""}><span className="action-circle"><Heart size={22} fill={liked.includes(index) ? "currentColor" : "none"}/></span><b>{liked.includes(index) ? "24.9K" : reel.likes}</b></button><button onClick={() => setNotice("Comments will be connected to live posts in the next pass.")}><span className="action-circle"><MessageCircle size={22}/></span><b>{reel.comments}</b></button><button onClick={() => setNotice("Sharing is coming soon.")}><span className="action-circle"><Send size={20}/></span><b>Share</b></button></div></div>
