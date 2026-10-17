@@ -13,6 +13,7 @@
 - Reels view is populated with illustrative sample items.
 - Likes and follows on the sample Reels are browser-local state, not persisted.
 - The public text-post list and text composer use `public.zeechat_posts`.
+- Community-post likes and comments are persisted in `public.zeechat_post_likes` and `public.zeechat_comments`.
 - Authentication is implemented with Supabase Auth on the login page.
 - Other sections are interface previews and should not be represented as finished backend features.
 
@@ -24,10 +25,10 @@ The post feed filters for public posts and the post composer requires an authent
 
 ## Before production
 
-- Confirm CI passes and fix any reported TypeScript, lint, or build issues.
+- Run `npm run lint` and `npm run build` locally before release; GitHub Actions is intentionally not used for this repository.
 - Configure the production Supabase URL/key in the hosting provider.
 - Configure allowed authentication redirect URLs and email confirmation.
 - Add abuse reporting, blocking, rate limits, moderation review, and privacy/data deletion flows.
-- Implement persistent likes/follows/comments, direct messaging, media storage, and upload validation.
+- Implement persistent follows, direct messaging, media storage, and upload validation.
 - Review RLS policies and test them using separate user accounts.
 - Add tests for sign-up, sign-in, post creation, visibility, and unauthorised writes.
