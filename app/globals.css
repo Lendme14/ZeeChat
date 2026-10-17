@@ -144,3 +144,20 @@ button{touch-action:manipulation}
   .mobile-nav button.active::before{display:none}
   .mobile-nav svg{width:23px;height:23px}
 }
+
+
+/* Polished bottom navigation: central circular post action and chat play shortcut */
+.chat-play-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:12px;border:1px solid #51405f;background:#21192b;color:#f0e5ff;font-size:12px;font-weight:700}
+.chat-play-button:hover{background:#30213d;border-color:#a66bca}
+@media(max-width:600px){
+  .immersive-reels .reel-player{touch-action:pan-y}
+  .mobile-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;gap:2px}
+  .mobile-nav button{width:100%;min-width:0}
+  .mobile-nav .post-nav-button{align-content:center;justify-items:center;gap:1px;color:#626760}
+  .post-nav-orbit{width:49px;height:49px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,#13d6a0,#00a879);color:#073d31;border:3px solid #f0eee8;box-shadow:0 4px 14px #00a87935;transform:translateY(-12px);margin-bottom:-10px}
+  .post-nav-button>span:last-child{font-size:10px;font-weight:750}
+  .mobile-nav .post-nav-button:active .post-nav-orbit{transform:translateY(-12px) scale(.94)}
+  .chat-play-button{width:39px;height:39px;padding:0;flex:0 0 39px;border-radius:50%;gap:0}
+  .chat-play-button span{display:none}
+  .topbar:has(+ .notice) .chat-play-button{flex-shrink:0}
+}
