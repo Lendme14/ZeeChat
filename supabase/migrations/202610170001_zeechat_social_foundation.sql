@@ -85,7 +85,7 @@ create policy "Users comment as themselves" on public.zeechat_comments for inser
 );
 create policy "Users delete their own comments" on public.zeechat_comments for delete to authenticated using (auth.uid() = author_id);
 
-create or replace function public.zeechat_handle_new_user()
+create or replace function private.zeechat_handle_new_user()
 returns trigger
 language plpgsql
 security definer
@@ -114,4 +114,4 @@ $$;
 drop trigger if exists on_auth_user_created_zeechat_profile on auth.users;
 create trigger on_auth_user_created_zeechat_profile
 after insert on auth.users
-for each row execute procedure public.zeechat_handle_new_user();
+for each row execute procedure private.zeechat_handle_new_user();
