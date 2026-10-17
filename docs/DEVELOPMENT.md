@@ -12,14 +12,14 @@
 
 - Reels view is populated with illustrative sample items.
 - Likes and follows on the sample Reels are browser-local state, not persisted.
-- The public text-post list and text composer use `public.zeechat_posts`.
+- The public text/photo-post list and composer use `public.zeechat_posts` and the `zeechat-media` Supabase Storage bucket (JPEG, PNG, WebP, GIF up to 8 MB).
 - Community-post likes and comments are persisted in `public.zeechat_post_likes` and `public.zeechat_comments`.
 - Authentication is implemented with Supabase Auth on the login page.
 - Other sections are interface previews and should not be represented as finished backend features.
 
 ## Database
 
-The migration in `supabase/migrations` defines ZeeChat-specific tables and row-level security. Apply it only to the intended Supabase project after reviewing it. It is designed to be additive and does not modify existing Zonix tables.
+The migrations in `supabase/migrations` define ZeeChat-specific tables, row-level security, and the `zeechat-media` storage bucket/policies. They are designed to be additive and do not modify existing Zonix tables.
 
 The post feed filters for public posts and the post composer requires an authenticated user. Test with a dedicated development account before launch.
 
