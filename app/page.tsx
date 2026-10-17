@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type View = "Reels" | "Discover" | "Play" | "Chats" | "Profile";
 type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; };
+type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 const sampleReels = [
   { user: "mira.moves", caption: "POV: the group chat finally makes it outside 😂✨", tags: "#goodvibes #weekendenergy", sound: "original audio · Mira", image: "photo-1533174072545-7a4b6ad7a6c3", likes: "24.8K", comments: "1,204", initial: "M" },
   { user: "jaycreates", caption: "When the beat drops and nobody is ready 🔥", tags: "#dancebreak #zeevibes", sound: "Late Night Bounce · DJ K", image: "photo-1501386761578-eac5c94b800a", likes: "18.2K", comments: "936", initial: "J" },
@@ -26,6 +27,11 @@ export default function HomePage() {
   const [postLikeCounts, setPostLikeCounts] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
   const [likeBusyIds, setLikeBusyIds] = useState<string[]>([]);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [openCommentPostIds, setOpenCommentPostIds] = useState<string[]>([]);
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, PostComment[]>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentBusyIds, setCommentBusyIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,6 +60,11 @@ export default function HomePage() {
           }
           setPostLikeCounts(counts);
           setLikedPostIds(mine);
+          const { data: comments } = await supabase.from("zeechat_comments").select("id,post_id,author_id,body,created_at").in("post_id", loadedPosts.map(post => post.id));
+          if (!active) return;
+          const commentTally: Record<string, number> = {};
+          for (const comment of comments ?? []) commentTally[comment.post_id] = (commentTally[comment.post_id] ?? 0) + 1;
+          setCommentCounts(commentTally);
         });
     } catch {
       setNotice("Add your Supabase keys to .env.local to enable accounts and live posts.");
@@ -78,6 +89,40 @@ export default function HomePage() {
       setNotice(error instanceof Error ? error.message : "Could not update like. Please try again.");
     } finally {
       setLikeBusyIds(ids => ids.filter(id => id !== postId));
+    }
+  }
+
+  async function toggleComments(postId: string) {
+    const isOpen = openCommentPostIds.includes(postId);
+    setOpenCommentPostIds(ids => isOpen ? ids.filter(id => id !== postId) : [...ids, postId]);
+    if (isOpen || commentsByPost[postId]) return;
+    try {
+      const { data, error } = await createClient().from("zeechat_comments")
+        .select("id,post_id,author_id,body,created_at").eq("post_id", postId).order("created_at", { ascending: true });
+      if (error) throw error;
+      setCommentsByPost(current => ({ ...current, [postId]: (data ?? []) as PostComment[] }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not load comments.");
+    }
+  }
+
+  async function submitComment(postId: string) {
+    const body = (commentDrafts[postId] ?? "").trim();
+    if (!body) return;
+    if (!userId) { setNotice("Sign in to comment on community posts."); return; }
+    if (commentBusyIds.includes(postId)) return;
+    setCommentBusyIds(ids => [...ids, postId]);
+    try {
+      const { data, error } = await createClient().from("zeechat_comments")
+        .insert({ post_id: postId, author_id: userId, body }).select("id,post_id,author_id,body,created_at").single();
+      if (error) throw error;
+      setCommentsByPost(current => ({ ...current, [postId]: [...(current[postId] ?? []), data as PostComment] }));
+      setCommentCounts(counts => ({ ...counts, [postId]: (counts[postId] ?? 0) + 1 }));
+      setCommentDrafts(current => ({ ...current, [postId]: "" }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not post comment. Please try again.");
+    } finally {
+      setCommentBusyIds(ids => ids.filter(id => id !== postId));
     }
   }
 
@@ -114,7 +159,7 @@ export default function HomePage() {
           <div className="reel-caption"><div className="creator-row"><span className="creator-avatar">{reel.initial}</span><div><b>{reel.user} <ShieldCheck size={13}/></b><small>Creator · 2h ago</small></div><button className="follow-button" onClick={() => setFollowing(a => a.includes(index) ? a.filter(x => x !== index) : [...a, index])}>{following.includes(index) ? "Following" : "Follow +"}</button></div><p>{reel.caption}</p><strong>{reel.tags}</strong><small className="sound-line">♫ &nbsp;{reel.sound}</small></div>
         </div><div className="reel-actions"><button onClick={() => setLiked(a => a.includes(index) ? a.filter(x => x !== index) : [...a, index])} className={liked.includes(index) ? "liked" : ""}><span className="action-circle"><Heart size={22} fill={liked.includes(index) ? "currentColor" : "none"}/></span><b>{liked.includes(index) ? "24.9K" : reel.likes}</b></button><button onClick={() => setNotice("Comments will be connected to live posts in the next pass.")}><span className="action-circle"><MessageCircle size={22}/></span><b>{reel.comments}</b></button><button onClick={() => setNotice("Sharing is coming soon.")}><span className="action-circle"><Send size={20}/></span><b>Share</b></button></div></div>
         <div className="reel-switcher"><button disabled={index === 0} onClick={() => setIndex(i => i - 1)}>↑ Previous</button><span>{index + 1} / {sampleReels.length}</span><button disabled={index === sampleReels.length - 1} onClick={() => setIndex(i => i + 1)}>Next ↓</button></div>
-        <section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id}><div className="post-avatar">z</div><div className="post-body"><b>Community post</b><small>{new Date(p.created_at).toLocaleString()}</small><p>{p.caption}</p><div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button></div></div></article>) : <p className="muted">Live text posts will show up here when people start sharing.</p>}</section>
+        <section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id}><div className="post-avatar">z</div><div className="post-body"><b>Community post</b><small>{new Date(p.created_at).toLocaleString()}</small><p>{p.caption}</p><div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small><p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">Live text posts will show up here when people start sharing.</p>}</section>
       </section>}
       {view === "Discover" && <section className="content-view"><span className="eyebrow">YOUR NEXT FAVOURITE THING</span><h1>Find your <em>people.</em></h1><p>Creators, conversations and little adventures picked for your vibe.</p><div className="feature-grid">{[["😂","Make us laugh","Jump into today's comedy challenge."],["🎧","Music heads","Find people who love the same sounds."],["🎮","Play something","Fast games, friendly chaos."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("Discovery recommendations are currently preview content.")}>Explore ↗</button></article>)}</div></section>}
       {view === "Play" && <section className="content-view"><span className="eyebrow">BOREDOM DOESN'T LIVE HERE</span><h1>Let's <em>play.</em></h1><p>Little games, big laughs, and people to share them with.</p><div className="feature-grid">{[["🧠","Quickfire Trivia","5 questions. How sharp are you?"],["😂","Caption This","Make the funniest caption win."],["🎤","Voice Room Roulette","Meet people around shared interests."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("This activity is a UI preview; scoring and rewards are not yet connected.")}>Join activity ↗</button></article>)}</div></section>}
