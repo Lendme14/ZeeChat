@@ -34,17 +34,18 @@ The post feed filters for public posts and the post composer requires an authent
 - Add tests for sign-up, sign-in, post creation, visibility, and unauthorised writes.
 
 
-## Railway deployment (without GitHub Actions)
+## Vercel deployment (without GitHub Actions)
 
-Railway can build and run this repository directly from its connected GitHub repository; GitHub Actions is not required.
+Vercel can build and deploy this Next.js repository directly from GitHub. GitHub Actions is not required.
 
-1. In Railway, create or open the ZeeChat service and connect `Lendme14/ZeeChat` on the intended branch (normally `main`).
-2. Set these service variables in Railway's Variables panel:
-   - `NEXT_PUBLIC_SUPABASE_URL` — the ZeeChat Supabase project URL.
+1. In Vercel, choose **Add New → Project**, import `Lendme14/ZeeChat`, and select the production branch (normally `main`). If the project already exists, open its settings rather than creating a duplicate.
+2. Keep the project root directory set to the repository root. Vercel should detect Next.js automatically.
+3. Add these environment variables under **Project Settings → Environment Variables** for the environments you intend to use:
+   - `NEXT_PUBLIC_SUPABASE_URL` — the intended Supabase project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — the project's publishable/anon key.
-3. Use Node.js 20 or newer. The repository scripts are `npm run build` and `npm run start`; Railway should build with the build script and start with the start script. If the service does not detect them automatically, set the build command to `npm run build` and the start command to `npm run start`.
-4. Deploy and inspect the service's **Build Logs** first, then **Deploy Logs**. A successful build alone does not prove Supabase sign-up, RLS, or posting works.
-5. In Supabase Authentication settings, add the deployed Railway URL to the allowed Site URL / redirect URLs as appropriate. Test sign-up, sign-in, publishing a text post, liking it, and commenting with two separate test accounts.
-6. Keep secrets out of Git. Only the public/publishable Supabase key belongs in `NEXT_PUBLIC_*` variables; never put a Supabase service-role key in client-visible variables.
+4. Deploy and review the **Build Logs**. The expected scripts are `npm run build` and `npm run start`; Vercel's Next.js preset normally configures the build and hosting behavior automatically.
+5. In Supabase Authentication settings, add the Vercel production domain (and any preview domain you actually use) to the allowed Site URL / redirect URLs as appropriate.
+6. Test sign-up, sign-in, publishing a text post, liking it, and commenting with two separate test accounts. A successful deployment alone does not prove database permissions and auth flows work.
+7. Keep secrets out of Git. Only the public/publishable Supabase key belongs in `NEXT_PUBLIC_*` variables; never put a Supabase service-role key in client-visible variables.
 
-Do not create a GitHub Actions workflow for this project. Railway's own build/deploy pipeline is separate from GitHub Actions.
+Do not create a GitHub Actions workflow for this project. Vercel's Git integration builds and deploys directly from the repository.
