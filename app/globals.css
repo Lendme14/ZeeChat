@@ -888,3 +888,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .sound-card-actions .create-button{white-space:nowrap}
 .reel-caption .reel-delete-button{margin-top:8px}
 @media(max-width:600px){.sound-card-actions{width:100%;padding-left:54px}.sound-card-actions .create-button{flex:1}.content-delete-button{min-height:32px}}
+
+.profile-delete-button{margin:0 0 10px;max-width:100%}
+.profile-post-item .content-delete-button{align-self:flex-start}
