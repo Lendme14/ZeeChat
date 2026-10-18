@@ -433,22 +433,38 @@ export default function HomePage() {
       const supabase = createClient();
       const { data: creator, error: lookupError } = await supabase.from("zeechat_profiles").select("user_id,username").eq("username", username).maybeSingle();
       if (lookupError) throw lookupError;
-      if (!creator) { setNotice("This sample creator is not linked to a ZeeChat account yet."); return; }
+      if (!creator) { setNotice("This creator is not linked to a ZeeChat account yet."); return; }
       if (creator.user_id === userId) { setNotice("You cannot follow your own profile."); return; }
       const { data: existing, error: followLookupError } = await supabase.from("zeechat_follows").select("follower_id").eq("follower_id", userId).eq("followed_id", creator.user_id).maybeSingle();
       if (followLookupError) throw followLookupError;
-      if (existing) {
-        const { error } = await supabase.from("zeechat_follows").delete().eq("follower_id", userId).eq("followed_id", creator.user_id);
-        if (error) throw error;
-        setCreatorFollowState(state => ({ ...state, [username]: false }));
-        setNotice("You unfollowed @" + username + ".");
-      } else {
-        const { error } = await supabase.from("zeechat_follows").insert({ follower_id: userId, followed_id: creator.user_id });
-        if (error) throw error;
-        setCreatorFollowState(state => ({ ...state, [username]: true }));
-        setNotice("You’re now following @" + username + ".");
+
+      const wasFollowing = Boolean(existing);
+      const nextFollowing = !wasFollowing;
+      // Update the visible state before the write completes so the control feels immediate.
+      setCreatorFollowState(state => ({ ...state, [username]: nextFollowing }));
+      setFollowCounts(counts => ({
+        followers: Math.max(0, counts.followers),
+        following: Math.max(0, counts.following + (nextFollowing ? 1 : -1))
+      }));
+      try {
+        if (wasFollowing) {
+          const { error } = await supabase.from("zeechat_follows").delete().eq("follower_id", userId).eq("followed_id", creator.user_id);
+          if (error) throw error;
+          setNotice("You unfollowed @" + username + ".");
+        } else {
+          const { error } = await supabase.from("zeechat_follows").insert({ follower_id: userId, followed_id: creator.user_id });
+          if (error) throw error;
+          setNotice("You’re now following @" + username + ".");
+        }
+      } catch (writeError) {
+        setCreatorFollowState(state => ({ ...state, [username]: wasFollowing }));
+        setFollowCounts(counts => ({
+          followers: counts.followers,
+          following: Math.max(0, counts.following + (wasFollowing ? 1 : -1))
+        }));
+        throw writeError;
       }
-      await refreshFollowCounts(userId);
+      void refreshFollowCounts(userId);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not update follow status.");
     } finally { setFollowBusy(false); }
