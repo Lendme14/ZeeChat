@@ -257,24 +257,58 @@ export default function HomePage() {
 
   async function uploadProfileImage(file: File, kind: "avatar" | "cover") {
     if (!userId) { setNotice("Sign in to customize your profile."); return; }
-    if (!file.type.startsWith("image/") || !["image/jpeg","image/png","image/webp","image/gif"].includes(file.type)) { setNotice("Choose a JPG, PNG, WebP, or GIF image."); return; }
-    if (file.size > 8 * 1024 * 1024) { setNotice("Choose an image smaller than 8 MB."); return; }
-    const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" } as Record<string,string>)[file.type] || "jpg";
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      setNotice("This image format isn't supported. Choose a JPG, PNG, WebP, or GIF image.");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setNotice("This image is larger than 20 MB. Please choose a smaller image.");
+      return;
+    }
+
     if (kind === "avatar") setAvatarUploadBusy(true);
     else setCoverUploadBusy(true);
+
+    let stage: "upload" | "save" = "upload";
+    let uploadedPath: string | null = null;
     try {
       const supabase = createClient();
+      const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" } as Record<string, string>)[file.type];
       const path = userId + "/profile-" + kind + "-" + Date.now() + "." + extension;
-      const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(path, file, { contentType: file.type, upsert: false });
-      if (uploadError) throw uploadError;
+      const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(path, file, {
+        contentType: file.type,
+        cacheControl: "3600",
+        upsert: false,
+      });
+      if (uploadError) throw new Error("Storage upload failed: " + uploadError.message);
+      uploadedPath = path;
+
       const { data: publicUrl } = supabase.storage.from("zeechat-media").getPublicUrl(path);
       const field = kind === "avatar" ? "avatar_url" : "cover_url";
-      const { data, error } = await supabase.from("zeechat_profiles").update({ [field]: publicUrl.publicUrl }).eq("user_id", userId).select("username,display_name,bio,avatar_url,cover_url").single();
-      if (error) throw error;
+      stage = "save";
+      const { data, error } = await supabase.from("zeechat_profiles")
+        .update({ [field]: publicUrl.publicUrl })
+        .eq("user_id", userId)
+        .select("username,display_name,bio,avatar_url,cover_url")
+        .maybeSingle();
+
+      if (error) throw new Error("Image uploaded, but saving it to your profile failed: " + error.message);
+      if (!data) throw new Error("Image uploaded, but your ZeeChat profile record wasn't found. Sign out and back in, then try again.");
       setProfile(data as ProfileSummary);
-      setNotice(kind === "avatar" ? "Profile photo updated." : "Cover photo updated.");
+      setNotice(kind === "avatar" ? "Profile photo updated successfully." : "Cover photo updated successfully.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not upload that image.");
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error("ZeeChat " + kind + " upload failed at " + stage, error);
+      setNotice(detail || (stage === "upload" ? "Could not upload this image. Check your connection and try again." : "The image uploaded, but your profile could not be updated."));
+      // If saving the profile failed after the file upload, remove the unused object to avoid orphaned uploads.
+      if (uploadedPath) {
+        try {
+          await createClient().storage.from("zeechat-media").remove([uploadedPath]);
+        } catch (cleanupError) {
+          console.warn("Could not clean up failed " + kind + " upload", cleanupError);
+        }
+      }
     } finally {
       if (kind === "avatar") setAvatarUploadBusy(false);
       else setCoverUploadBusy(false);
