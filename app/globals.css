@@ -404,3 +404,25 @@ button:disabled{cursor:not-allowed;opacity:.58}
  .party-access-options{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.party-live-card,.party-hero-orbit{animation:none!important;transition:none!important}}
+
+
+/* Reels refinement: one compact overlay header and a quieter create action */
+@media(max-width:600px){
+  .topbar.reels-topbar{display:none!important}
+  .immersive-reels{padding:0!important;margin:0!important;max-width:none!important}
+  .immersive-reels .reel-layout{display:block!important;margin:0!important}
+  .immersive-reels .reel-player{border-radius:0!important}
+  .immersive-reels .immersive-reel-header{top:calc(max(10px,env(safe-area-inset-top)) + 8px)!important;left:12px!important;right:12px!important;display:flex!important;align-items:center!important;gap:10px!important}
+  .immersive-reels .immersive-brand{flex:0 0 auto!important;gap:6px!important;padding:5px 8px!important;border:0!important;background:#06100d80!important;font-size:15px!important;box-shadow:none!important}
+  .immersive-reels .immersive-brand-mark{width:24px!important;height:24px!important;border-radius:8px!important;font-size:15px!important}
+  .reel-feed-tabs{display:flex;align-items:center;justify-content:center;gap:14px;flex:1;min-width:0}
+  .reel-feed-tabs button{position:relative;padding:8px 0;border:0;background:transparent;color:#ffffffb5;font-size:12px;font-weight:650;white-space:nowrap;text-shadow:0 1px 8px #0008}
+  .reel-feed-tabs button.selected{color:#fff;font-weight:850}
+  .reel-feed-tabs button.selected:after{content:"";position:absolute;bottom:1px;left:25%;right:25%;height:2px;border-radius:2px;background:#20d5a5}
+  .immersive-reels .immersive-search{flex:0 0 36px;width:36px!important;height:36px!important;border:0!important;background:#06100d80!important}
+  .immersive-reels .reel-progress{display:none!important}
+  .immersive-reels .sound-button{top:calc(max(10px,env(safe-area-inset-top)) + 62px)!important;right:14px!important}
+  .mobile-nav .post-nav-orbit{width:42px!important;height:42px!important;box-shadow:0 5px 16px #0ba98030!important}
+  .mobile-nav .post-nav-orbit svg{width:23px!important;height:23px!important}
+}
+@media(min-width:601px){.reel-feed-tabs{display:flex;align-items:center;gap:18px;margin-left:auto;margin-right:8px}.reel-feed-tabs button{padding:8px 0;border:0;background:transparent;color:#b4c2bc;font-size:12px}.reel-feed-tabs button.selected{color:#6fe3be;font-weight:800}}
