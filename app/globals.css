@@ -891,3 +891,36 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 
 .profile-delete-button{margin:0 0 10px;max-width:100%}
 .profile-post-item .content-delete-button{align-self:flex-start}
+
+
+/* Consistent contextual actions: keep destructive controls out of the content flow. */
+.content-action-menu{position:relative;display:inline-flex;align-items:center;flex:0 0 auto;z-index:8}
+.content-action-trigger{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.content-action-trigger:hover,.content-action-trigger[aria-expanded="true"]{background:var(--panel2);border-color:var(--line);color:var(--text)}
+.content-action-trigger:focus-visible,.content-action-popup button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.content-action-trigger:disabled{opacity:.45;cursor:not-allowed}
+.content-action-popup{position:absolute;right:0;top:calc(100% + 6px);min-width:150px;padding:5px;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:0 12px 34px #0006;z-index:100}
+.content-action-popup button{display:flex;width:100%;align-items:center;text-align:left;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.content-action-popup button:hover{background:var(--panel2)}
+.content-action-popup .content-action-danger{color:#ff8798}
+.post-meta-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.post-meta-row>small{min-width:0;overflow-wrap:anywhere}
+.post-meta-row .content-action-trigger{width:32px;height:32px}
+.comment-row .content-action-menu{float:right;margin:-7px -5px 2px 8px}
+.reel-caption-heading{display:flex;align-items:flex-start;gap:8px}
+.reel-caption-heading>p{flex:1;min-width:0;margin-top:0}
+.reel-caption-heading .content-action-menu{margin-top:-5px}
+.sound-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sound-card-actions .create-button{flex:1;min-width:0}
+.profile-post-item{position:relative}
+.profile-post-menu{position:absolute;top:8px;right:8px;z-index:8}
+.profile-post-menu .content-action-trigger{background:var(--panel);border-color:var(--line);box-shadow:0 2px 10px #0003}
+.profile-post-menu .content-action-popup{top:calc(100% + 4px)}
+@media(max-width:600px){
+ .content-action-trigger{width:36px;height:36px}
+ .content-action-popup{min-width:145px}
+ .post-meta-row{gap:5px}
+ .post-meta-row>small{font-size:10px}
+ .sound-card-actions{width:100%;padding-left:0}
+ .profile-post-menu{top:6px;right:6px}
+}
