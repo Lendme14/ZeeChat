@@ -108,6 +108,7 @@ export default function HomePage() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatOpenRequestRef = useRef(0);
   const activeConversationRef = useRef<string | null>(null);
+  const inboxLoadRequestRef = useRef(0);
   const [selectedCreator, setSelectedCreator] = useState<{username:string;initial:string}|null>(null);
   const [selectedCreatorProfile, setSelectedCreatorProfile] = useState<(ProfileSummary & { user_id: string }) | null>(null);
   const [selectedCreatorPosts, setSelectedCreatorPosts] = useState<Post[]>([]);
@@ -347,23 +348,30 @@ export default function HomePage() {
   }, [userId, activeConversationId, activeChat]);
 
   async function loadInbox(currentUserId: string) {
+    const requestId = ++inboxLoadRequestRef.current;
+    const isLatestRequest = () => requestId === inboxLoadRequestRef.current;
     try {
       const supabase = createClient();
       const { data: memberships, error } = await supabase.from("zeechat_conversation_members").select("conversation_id").eq("user_id", currentUserId);
       if (error) throw error;
+      if (!isLatestRequest()) return;
       const conversationIds = [...new Set((memberships ?? []).map(row => row.conversation_id as string))];
       if (!conversationIds.length) { setInboxConversations([]); return; }
       const { data: members, error: memberError } = await supabase.from("zeechat_conversation_members").select("conversation_id,user_id").in("conversation_id", conversationIds).neq("user_id", currentUserId);
       if (memberError) throw memberError;
+      if (!isLatestRequest()) return;
       const otherIds = [...new Set((members ?? []).map(row => row.user_id as string))];
       const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", otherIds);
       if (profileError) throw profileError;
+      if (!isLatestRequest()) return;
       const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });
       if (messageError) throw messageError;
+      if (!isLatestRequest()) return;
       const latest: Record<string, LiveMessage> = {}; for (const message of (messages ?? []) as LiveMessage[]) if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
       const profileById: Record<string, {username:string;display_name:string;avatar_url:string|null}> = {}; for (const p of profiles ?? []) profileById[p.user_id] = p;
       setInboxConversations((members ?? []).map(member => { const p=profileById[member.user_id]; const last=latest[member.conversation_id]; return {id:member.conversation_id,otherUserId:member.user_id,username:p?.username ?? "member",displayName:p?.display_name ?? "ZeeChat member",avatarUrl:p?.avatar_url ?? null,lastMessage:last?.body ?? "Say hello 👋",lastAt:last?.created_at ?? null}; }).filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).sort((a,b)=>(b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
     } catch (error) {
+      if (!isLatestRequest()) return;
       console.error("Unable to load ZeeChat inbox", error);
       setNotice(error instanceof Error ? `Inbox could not refresh: ${error.message}` : "Inbox could not refresh. Check your connection and try again.");
     }
