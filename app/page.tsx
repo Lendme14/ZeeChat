@@ -248,6 +248,34 @@ export default function HomePage() {
   }, []);
 
 
+  useEffect(() => {
+    if (!userId || !activeConversationId || !activeChat) return;
+    const supabase = createClient();
+    let active = true;
+    const channel = supabase
+      .channel("zeechat-messages-" + activeConversationId)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "zeechat_messages",
+        filter: "conversation_id=eq." + activeConversationId
+      }, payload => {
+        if (!active) return;
+        const incoming = payload.new as LiveMessage;
+        if (!incoming?.id || incoming.conversation_id !== activeConversationId) return;
+        setLiveMessages(current => current.some(message => message.id === incoming.id)
+          ? current
+          : [...current.filter(message => !(message.id.startsWith("optimistic-") && message.sender_id === incoming.sender_id && message.body === incoming.body)), incoming]
+            .sort((a, b) => a.created_at.localeCompare(b.created_at)));
+        void loadInbox(userId);
+      })
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, activeConversationId, activeChat]);
+
   async function loadInbox(currentUserId: string) {
     try {
       const supabase = createClient();
@@ -291,7 +319,7 @@ export default function HomePage() {
     const body=chatDraft.trim();
     if(!body || !activeConversationId || !userId) return;
     const conversationId=activeConversationId;
-    const optimistic: LiveMessage={id:crypto.randomUUID(),conversation_id:conversationId,sender_id:userId,body,created_at:new Date().toISOString()};
+    const optimistic: LiveMessage={id:"optimistic-"+crypto.randomUUID(),conversation_id:conversationId,sender_id:userId,body,created_at:new Date().toISOString()};
     setLiveMessages(current=>[...current,optimistic]);
     setChatDraft("");
     try {
