@@ -814,3 +814,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .profile-stats b{font-size:18px;}
 .profile-stats small{color:var(--muted);font-size:12px;}
 @media(max-width:600px){.profile-image-change{font-size:11px;padding:7px 10px}.profile-stats{gap:22px}}
+
+/* Reliable touch targets for profile image pickers on mobile browsers */
+.profile-image-change{position:relative;overflow:hidden;cursor:pointer;touch-action:manipulation;}
+.profile-image-change input[type="file"]{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;pointer-events:auto!important;cursor:pointer!important;font-size:100px!important;}
+.profile-image-change[aria-disabled="true"]{opacity:.65;pointer-events:none;}
