@@ -860,7 +860,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
  .reels-view.immersive-reels .reel-feed-tabs{justify-content:space-evenly!important;gap:clamp(4px,1.6vw,10px)!important}
  .reels-view.immersive-reels .reel-feed-tabs button{font-size:clamp(10px,3vw,12px)!important}
  .reels-view.immersive-reels .immersive-search{flex:0 0 34px!important;width:34px!important;height:34px!important}
- .reels-view.immersive-reels .reel-video-controls{top:calc(96px + env(safe-area-inset-top))!important;bottom:auto!important;left:10px!important;right:64px!important;padding:7px!important}
+ .reels-view.immersive-reels .reel-video-controls{top:auto!important;bottom:calc(108px + env(safe-area-inset-bottom))!important;left:10px!important;right:64px!important;padding:7px!important;max-width:calc(100% - 74px)!important}
  .reels-view.immersive-reels .reel-caption{left:12px!important;right:64px!important;bottom:calc(12px + env(safe-area-inset-bottom))!important;padding:24px 0 0!important;max-height:34%!important;overflow:hidden!important}
  .reels-view.immersive-reels .reel-caption p{-webkit-line-clamp:2!important;font-size:12px!important}
  .reels-view.immersive-reels .reel-caption strong{font-size:10px!important}
