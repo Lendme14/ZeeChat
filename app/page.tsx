@@ -27,7 +27,12 @@ export default function HomePage() {
   const lastWheelAt = useRef(0);
   const [liked, setLiked] = useState<number[]>([]);
   const [following, setFollowing] = useState<number[]>([]);
-  const [createOpen, setCreateOpen] = useState(false);\n  const [partyCreateOpen, setPartyCreateOpen] = useState(false);\n  const [partyName, setPartyName] = useState("");\n  const [partyDescription, setPartyDescription] = useState("");\n  const [partyFormat, setPartyFormat] = useState<"video" | "audio" | "watch">("video");\n  const [partyAccess, setPartyAccess] = useState<"public" | "private">("public");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [partyCreateOpen, setPartyCreateOpen] = useState(false);
+  const [partyName, setPartyName] = useState("");
+  const [partyDescription, setPartyDescription] = useState("");
+  const [partyFormat, setPartyFormat] = useState<"video" | "audio" | "watch">("video");
+  const [partyAccess, setPartyAccess] = useState<"public" | "private">("public");
   const [caption, setCaption] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
