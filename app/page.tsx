@@ -285,13 +285,23 @@ export default function HomePage() {
   }
 
   async function sendLiveMessage() {
-    const body=chatDraft.trim(); if(!body || !activeConversationId || !userId) return;
-    const optimistic: LiveMessage={id:crypto.randomUUID(),conversation_id:activeConversationId,sender_id:userId,body,created_at:new Date().toISOString()};
-    setLiveMessages(current=>[...current,optimistic]); setChatDraft("");
+    const body=chatDraft.trim();
+    if(!body || !activeConversationId || !userId) return;
+    const conversationId=activeConversationId;
+    const optimistic: LiveMessage={id:crypto.randomUUID(),conversation_id:conversationId,sender_id:userId,body,created_at:new Date().toISOString()};
+    setLiveMessages(current=>[...current,optimistic]);
+    setChatDraft("");
     try {
-      const supabase=createClient(); const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:activeConversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();
-      if(error) throw error; setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message)); await loadInbox(userId);
-    } catch(error) { setLiveMessages(current=>current.filter(message=>message.id!==optimistic.id)); setChatDraft(body); setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again."); }
+      const supabase=createClient();
+      const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();
+      if(error) throw error;
+      setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message));
+      await loadInbox(userId);
+    } catch(error) {
+      setLiveMessages(current=>current.filter(message=>message.id!==optimistic.id));
+      setChatDraft(current=>current || body);
+      setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again.");
+    }
   }
 
   function openProfileEditor() {
