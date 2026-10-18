@@ -13,6 +13,22 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  async function signInWithGoogle() {
+    setBusy(true); setMessage("");
+    try {
+      const { error } = await createClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/login` } });
+      if (error) throw error;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Google sign-in could not start. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  function continueWithZonix() {
+    setMode("signin");
+    setMessage("Use the same Zonix account email and password here. If you normally use Google on Zonix, choose Continue with Google.");
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setMessage("");
     try {
@@ -31,5 +47,5 @@ export default function LoginPage() {
     finally { setBusy(false); }
   }
 
-  return <main className="auth-page"><Link href="/" className="brand"><span className="brand-mark">z</span><span>Zee<b>Chat</b></span></Link><section className="auth-card"><span className="eyebrow">A LITTLE LESS BOREDOM</span><h1>{mode === "signup" ? "Your people are" : "Welcome"} <em>{mode === "signup" ? "out there." : "back."}</em></h1><p>Find your vibe. Make your moment. Keep it going.</p><div className="auth-switch"><button className={mode === "signup" ? "selected" : ""} onClick={() => setMode("signup")}>Create account</button><button className={mode === "signin" ? "selected" : ""} onClick={() => setMode("signin")}>Sign in</button></div><form onSubmit={submit}>{mode === "signup" && <><label>Username<input value={username} onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""))} minLength={3} maxLength={24} pattern="[a-zA-Z0-9_.]{3,24}" placeholder="your.vibe" required /></label><label>Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={60} placeholder="What should we call you?" /></label></>}<label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" required /></label><label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={8} placeholder="At least 8 characters" required /></label><button className="create-button auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "signup" ? "Create my account →" : "Sign in →"}</button></form>{message && <p className="auth-message" role="status">{message}</p>}<p className="auth-legal">Your account is secured by Supabase authentication. Use ZeeChat respectfully and follow community safety rules.</p><p className="auth-legal"><Link href="/login">Already have an account? Sign in</Link></p></section><p className="auth-footer">A little less scrolling. A lot more living. ✨</p></main>;
+  return <main className="auth-page"><Link href="/" className="brand"><span className="brand-mark">z</span><span>Zee<b>Chat</b></span></Link><section className="auth-card"><span className="eyebrow">A LITTLE LESS BOREDOM</span><h1>{mode === "signup" ? "Your people are" : "Welcome"} <em>{mode === "signup" ? "out there." : "back."}</em></h1><p>Find your vibe. Make your moment. Keep it going.</p><div className="auth-provider-actions"><button type="button" className="auth-provider-button" onClick={() => void signInWithGoogle()} disabled={busy}><span className="google-g" aria-hidden="true">G</span>Continue with Google</button><button type="button" className="auth-provider-button zonix-provider-button" onClick={continueWithZonix} disabled={busy}><span className="zonix-provider-mark" aria-hidden="true">Z</span>Continue with Zonix</button></div><div className="auth-provider-note">One account for Zonix and ZeeChat.</div><div className="auth-switch"><button className={mode === "signup" ? "selected" : ""} onClick={() => setMode("signup")}>Create account</button><button className={mode === "signin" ? "selected" : ""} onClick={() => setMode("signin")}>Sign in</button></div><form onSubmit={submit}>{mode === "signup" && <><label>Username<input value={username} onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""))} minLength={3} maxLength={24} pattern="[a-zA-Z0-9_.]{3,24}" placeholder="your.vibe" required /></label><label>Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={60} placeholder="What should we call you?" /></label></>}<label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" required /></label><label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={8} placeholder="At least 8 characters" required /></label><button className="create-button auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "signup" ? "Create my account →" : "Sign in →"}</button></form>{message && <p className="auth-message" role="status">{message}</p>}<p className="auth-legal">Your Zonix account securely connects you to ZeeChat. Use ZeeChat respectfully and follow community safety rules.</p><p className="auth-legal"><Link href="/login">Already have an account? Sign in</Link></p></section><p className="auth-footer">A little less scrolling. A lot more living. ✨</p></main>;
 }
