@@ -661,7 +661,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .chat-detail-header{display:flex;align-items:center;gap:12px;flex:0 0 auto;min-height:70px;padding:10px 16px;border-bottom:1px solid var(--zc-border,#252d2f);background:#0b1112}
 .chat-back-button,.chat-more-button{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border:1px solid #293333;border-radius:50%;background:#141c1d;color:#eaf3ef}
 .chat-contact{display:flex;align-items:center;gap:11px;flex:1;min-width:0;border:0;background:transparent;color:#f7faf9;text-align:left;padding:0}
-.chat-contact-avatar{position:relative;display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid #34584d;border-radius:50%;background:linear-gradient(145deg,#31594d,#182b27);color:#c7f8e5;font-weight:800;font-size:16px}
+.chat-contact-avatar{position:relative;display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;overflow:hidden;isolation:isolate;border:1px solid #34584d;border-radius:50%;background:linear-gradient(145deg,#31594d,#182b27);color:#c7f8e5;font-weight:800;font-size:16px}.chat-contact-avatar>img{display:block;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center;border-radius:inherit}.chat-contact-avatar>i{z-index:2;pointer-events:none}
 .chat-contact-avatar i,.chat-contact small i{display:inline-block;width:9px;height:9px;border:2px solid #0b1112;border-radius:50%;background:#22c995}
 .chat-contact-avatar i{position:absolute;right:-1px;bottom:0;width:12px;height:12px}
 .chat-contact>span:last-child{display:flex;flex-direction:column;gap:4px;min-width:0}
