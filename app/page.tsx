@@ -106,6 +106,8 @@ export default function HomePage() {
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
   const [inboxConversations, setInboxConversations] = useState<InboxConversation[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const chatOpenRequestRef = useRef(0);
+  const activeConversationRef = useRef<string | null>(null);
   const [selectedCreator, setSelectedCreator] = useState<{username:string;initial:string}|null>(null);
   const [selectedCreatorProfile, setSelectedCreatorProfile] = useState<(ProfileSummary & { user_id: string }) | null>(null);
   const [selectedCreatorPosts, setSelectedCreatorPosts] = useState<Post[]>([]);
@@ -266,7 +268,9 @@ export default function HomePage() {
         } else {
           setProfile(null);
           setInboxConversations([]);
+          activeConversationRef.current = null;
           setActiveConversationId(null);
+          setLiveMessages([]);
           setActiveChat(false);
         }
       };
@@ -367,6 +371,7 @@ export default function HomePage() {
 
   async function openExistingConversation(item: InboxConversation) {
     if (!userId) { setNotice("Sign in to view your messages."); return; }
+    const requestId = ++chatOpenRequestRef.current;
     setChatLoading(true);
     setActiveChat(false);
     try {
@@ -376,7 +381,9 @@ export default function HomePage() {
         .eq("conversation_id", item.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
+      if (requestId !== chatOpenRequestRef.current) return;
       setSelectedCreator({ username: item.username, initial: (item.displayName[0] || "Z").toUpperCase() });
+      activeConversationRef.current = item.id;
       setActiveConversationId(item.id);
       setLiveMessages((messages ?? []) as LiveMessage[]);
       setChatDraft("");
@@ -384,16 +391,18 @@ export default function HomePage() {
       setView("Chats");
       setNotice("");
     } catch (error) {
-      setNotice(error instanceof Error ? "Could not open conversation: " + error.message : "Could not open this conversation. Try again.");
+      if (requestId === chatOpenRequestRef.current) setNotice(error instanceof Error ? "Could not open conversation: " + error.message : "Could not open this conversation. Try again.");
     } finally {
-      setChatLoading(false);
+      if (requestId === chatOpenRequestRef.current) setChatLoading(false);
     }
   }
 
   async function openLiveConversation(targetUserId: string, targetUsername: string, targetInitial: string) {
     if (!userId) { setNotice("Sign in to start a conversation."); return; }
     if (targetUserId === userId) { setNotice("This is your own profile."); return; }
+    const requestId = ++chatOpenRequestRef.current;
     setChatLoading(true);
+    setActiveChat(false);
     try {
       const supabase=createClient();
       const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });
@@ -401,9 +410,11 @@ export default function HomePage() {
       const id=conversationId as string;
       const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").eq("conversation_id",id).order("created_at",{ascending:true});
       if (messageError) throw messageError;
+      if (requestId !== chatOpenRequestRef.current) return;
+      activeConversationRef.current = id;
       setActiveConversationId(id); setLiveMessages((messages ?? []) as LiveMessage[]); setSelectedCreator({username:targetUsername,initial:targetInitial}); void loadCreatorFollowState(targetUsername); setActiveChat(true); setView("Chats"); setNotice("");
       await loadInbox(userId);
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not open this conversation. Please try again."); } finally { setChatLoading(false); }
+    } catch (error) { if (requestId === chatOpenRequestRef.current) setNotice(error instanceof Error ? error.message : "Could not open this conversation. Please try again."); } finally { if (requestId === chatOpenRequestRef.current) setChatLoading(false); }
   }
 
   async function sendLiveMessage() {
@@ -417,12 +428,16 @@ export default function HomePage() {
       const supabase=createClient();
       const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();
       if(error) throw error;
-      setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message));
+      if (activeConversationRef.current === conversationId) {
+        setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message));
+      }
       await loadInbox(userId);
     } catch(error) {
       setLiveMessages(current=>current.filter(message=>message.id!==optimistic.id));
-      setChatDraft(current=>current || body);
-      setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again.");
+      if (activeConversationRef.current === conversationId) {
+        setChatDraft(current=>current || body);
+        setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again.");
+      }
     }
   }
 
