@@ -267,11 +267,18 @@ export default function HomePage() {
             }
           }
         } else {
+          // Invalidate pending inbox/chat requests so a late response from the
+          // previous session cannot repopulate private conversation state after sign-out.
+          inboxLoadRequestRef.current += 1;
+          chatOpenRequestRef.current += 1;
+          setChatLoading(false);
+          setChatDraft("");
           setProfile(null);
           setInboxConversations([]);
           activeConversationRef.current = null;
           setActiveConversationId(null);
           setLiveMessages([]);
+          setSelectedCreator(null);
           setActiveChat(false);
         }
       };
