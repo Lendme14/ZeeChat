@@ -9,7 +9,9 @@ type View = "Home" | "Reels" | "Discover" | "Parties" | "Play" | "Chats" | "Prof
 type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; };
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
-type ProfileSummary = { username: string; display_name: string; bio: string | null; };\ntype LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };\ntype InboxConversation = { id: string; otherUserId: string; username: string; displayName: string; avatarUrl: string | null; lastMessage: string; lastAt: string | null };
+type ProfileSummary = { username: string; display_name: string; bio: string | null; };
+type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+type InboxConversation = { id: string; otherUserId: string; username: string; displayName: string; avatarUrl: string | null; lastMessage: string; lastAt: string | null };
 const sampleReels = [
   { user: "mira.moves", caption: "POV: the group chat finally makes it outside 😂✨", tags: "#goodvibes #weekendenergy", sound: "original audio · Mira", image: "photo-1533174072545-7a4b6ad7a6c3", likes: "24.8K", comments: "1,204", initial: "M" },
   { user: "jaycreates", caption: "When the beat drops and nobody is ready 🔥", tags: "#dancebreak #zeevibes", sound: "Late Night Bounce · DJ K", image: "photo-1501386761578-eac5c94b800a", likes: "18.2K", comments: "936", initial: "J" },
@@ -54,7 +56,10 @@ export default function HomePage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [activeChat, setActiveChat] = useState(false);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);\n  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);\n  const [inboxConversations, setInboxConversations] = useState<InboxConversation[]>([]);\n  const [chatLoading, setChatLoading] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
+  const [inboxConversations, setInboxConversations] = useState<InboxConversation[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
   const [selectedCreator, setSelectedCreator] = useState<{username:string;initial:string}|null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [demoMessages, setDemoMessages] = useState<{id:number; text:string; mine:boolean; time:string}[]>([
@@ -98,6 +103,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let active = true;
+    let unsubscribeAuth = () => {};
     try {
       const supabase = createClient();
       const syncAuthUser = async (user: { id: string; email?: string } | null) => {
@@ -120,6 +126,7 @@ export default function HomePage() {
       const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
         void syncAuthUser(session?.user ?? null);
       });
+      unsubscribeAuth = () => authListener.subscription.unsubscribe();
       supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url").eq("visibility", "public").order("created_at", { ascending: false }).limit(10)
         .then(async ({ data, error }) => {
           if (!active) return;
@@ -154,10 +161,57 @@ export default function HomePage() {
     } catch {
       setNotice("Add your Supabase keys to .env.local to enable accounts and live posts.");
     }
-    return () => { active = false; };
+    return () => { active = false; unsubscribeAuth(); };
   }, []);
 
-\n  async function loadInbox(currentUserId: string) {\n    try {\n      const supabase = createClient();\n      const { data: memberships, error } = await supabase.from("zeechat_conversation_members").select("conversation_id").eq("user_id", currentUserId);\n      if (error) throw error;\n      const conversationIds = [...new Set((memberships ?? []).map(row => row.conversation_id as string))];\n      if (!conversationIds.length) { setInboxConversations([]); return; }\n      const { data: members, error: memberError } = await supabase.from("zeechat_conversation_members").select("conversation_id,user_id").in("conversation_id", conversationIds).neq("user_id", currentUserId);\n      if (memberError) throw memberError;\n      const otherIds = [...new Set((members ?? []).map(row => row.user_id as string))];\n      const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", otherIds);\n      if (profileError) throw profileError;\n      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });\n      if (messageError) throw messageError;\n      const latest: Record<string, LiveMessage> = {}; for (const message of (messages ?? []) as LiveMessage[]) if (!latest[message.conversation_id]) latest[message.conversation_id] = message;\n      const profileById: Record<string, {username:string;display_name:string;avatar_url:string|null}> = {}; for (const p of profiles ?? []) profileById[p.user_id] = p;\n      setInboxConversations((members ?? []).map(member => { const p=profileById[member.user_id]; const last=latest[member.conversation_id]; return {id:member.conversation_id,otherUserId:member.user_id,username:p?.username ?? "member",displayName:p?.display_name ?? "ZeeChat member",avatarUrl:p?.avatar_url ?? null,lastMessage:last?.body ?? "Say hello 👋",lastAt:last?.created_at ?? null}; }).filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).sort((a,b)=>(b.lastAt ?? "").localeCompare(a.lastAt ?? "")));\n    } catch (error) { console.error("Unable to load ZeeChat inbox", error); }\n  }\n\n  async function openLiveConversation(targetUserId: string, targetUsername: string, targetInitial: string) {\n    if (!userId) { setNotice("Sign in to start a conversation."); return; }\n    if (targetUserId === userId) { setNotice("This is your own profile."); return; }\n    setChatLoading(true);\n    try {\n      const supabase=createClient();\n      const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });\n      if (error) throw error;\n      const id=conversationId as string;\n      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").eq("conversation_id",id).order("created_at",{ascending:true});\n      if (messageError) throw messageError;\n      setActiveConversationId(id); setLiveMessages((messages ?? []) as LiveMessage[]); setSelectedCreator({username:targetUsername,initial:targetInitial}); setActiveChat(true); setView("Chats"); setNotice("");\n      await loadInbox(userId);\n    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not open this conversation. Please try again."); } finally { setChatLoading(false); }\n  }\n\n  async function sendLiveMessage() {\n    const body=chatDraft.trim(); if(!body || !activeConversationId || !userId) return;\n    const optimistic: LiveMessage={id:crypto.randomUUID(),conversation_id:activeConversationId,sender_id:userId,body,created_at:new Date().toISOString()};\n    setLiveMessages(current=>[...current,optimistic]); setChatDraft("");\n    try {\n      const supabase=createClient(); const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:activeConversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();\n      if(error) throw error; setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message)); await loadInbox(userId);\n    } catch(error) { setLiveMessages(current=>current.filter(message=>message.id!==optimistic.id)); setChatDraft(body); setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again."); }\n  }\n\n  function openProfileEditor() {
+
+  async function loadInbox(currentUserId: string) {
+    try {
+      const supabase = createClient();
+      const { data: memberships, error } = await supabase.from("zeechat_conversation_members").select("conversation_id").eq("user_id", currentUserId);
+      if (error) throw error;
+      const conversationIds = [...new Set((memberships ?? []).map(row => row.conversation_id as string))];
+      if (!conversationIds.length) { setInboxConversations([]); return; }
+      const { data: members, error: memberError } = await supabase.from("zeechat_conversation_members").select("conversation_id,user_id").in("conversation_id", conversationIds).neq("user_id", currentUserId);
+      if (memberError) throw memberError;
+      const otherIds = [...new Set((members ?? []).map(row => row.user_id as string))];
+      const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", otherIds);
+      if (profileError) throw profileError;
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });
+      if (messageError) throw messageError;
+      const latest: Record<string, LiveMessage> = {}; for (const message of (messages ?? []) as LiveMessage[]) if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
+      const profileById: Record<string, {username:string;display_name:string;avatar_url:string|null}> = {}; for (const p of profiles ?? []) profileById[p.user_id] = p;
+      setInboxConversations((members ?? []).map(member => { const p=profileById[member.user_id]; const last=latest[member.conversation_id]; return {id:member.conversation_id,otherUserId:member.user_id,username:p?.username ?? "member",displayName:p?.display_name ?? "ZeeChat member",avatarUrl:p?.avatar_url ?? null,lastMessage:last?.body ?? "Say hello 👋",lastAt:last?.created_at ?? null}; }).filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).sort((a,b)=>(b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
+    } catch (error) { console.error("Unable to load ZeeChat inbox", error); }
+  }
+
+  async function openLiveConversation(targetUserId: string, targetUsername: string, targetInitial: string) {
+    if (!userId) { setNotice("Sign in to start a conversation."); return; }
+    if (targetUserId === userId) { setNotice("This is your own profile."); return; }
+    setChatLoading(true);
+    try {
+      const supabase=createClient();
+      const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });
+      if (error) throw error;
+      const id=conversationId as string;
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").eq("conversation_id",id).order("created_at",{ascending:true});
+      if (messageError) throw messageError;
+      setActiveConversationId(id); setLiveMessages((messages ?? []) as LiveMessage[]); setSelectedCreator({username:targetUsername,initial:targetInitial}); setActiveChat(true); setView("Chats"); setNotice("");
+      await loadInbox(userId);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not open this conversation. Please try again."); } finally { setChatLoading(false); }
+  }
+
+  async function sendLiveMessage() {
+    const body=chatDraft.trim(); if(!body || !activeConversationId || !userId) return;
+    const optimistic: LiveMessage={id:crypto.randomUUID(),conversation_id:activeConversationId,sender_id:userId,body,created_at:new Date().toISOString()};
+    setLiveMessages(current=>[...current,optimistic]); setChatDraft("");
+    try {
+      const supabase=createClient(); const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:activeConversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();
+      if(error) throw error; setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message)); await loadInbox(userId);
+    } catch(error) { setLiveMessages(current=>current.filter(message=>message.id!==optimistic.id)); setChatDraft(body); setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again."); }
+  }
+
+  function openProfileEditor() {
     setDisplayNameDraft(profile?.display_name ?? "");
     setBioDraft(profile?.bio ?? "");
     setEditProfileOpen(true);
