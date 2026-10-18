@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, CalendarClock, Check, CheckCheck, Compass, Film, Gamepad2, Heart, LockKeyhole, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, VolumeX } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, CheckCheck, Compass, Film, Gamepad2, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, VolumeX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 function formatVideoTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const total = Math.floor(seconds); return Math.floor(total / 60) + ":" + String(total % 60).padStart(2, "0"); }
@@ -535,7 +535,7 @@ export default function HomePage() {
       <a className="brand" href="#"><span className="brand-mark">z</span><span>Zee<b>Chat</b></span></a>
       <p className="side-label">YOUR SPACE</p>
       {nav.map(({ name, icon: Icon }) => <button key={name} className={view === name ? "nav-link active" : "nav-link"} onClick={() => setView(name)}><Icon size={19}/><span>{name}</span>{name === "Chats" && <i className="unread"/>}</button>)}
-      <div className="sidebar-bottom"><div className="sidebar-promo"><Sparkles size={18}/><b>Make a little magic.</b><p>Your next favourite memory starts with a hello.</p><button onClick={() => setCreateOpen(true)}>Create something <Plus size={15}/></button></div><small>© 2026 ZeeChat · Good vibes only</small></div>
+      <div className="sidebar-bottom"><div className="sidebar-promo"><Sparkles size={18}/><b>Make a little magic.</b><p>Your next favourite memory starts with a hello.</p><button onClick={() => setCreateOpen(true)}>Create something <Plus size={15}/></button></div>{userId && <button type="button" className="nav-link sign-out-button" onClick={async () => { try { const { error } = await createClient().auth.signOut(); if (error) throw error; setView("Home"); setNotice("You have been signed out."); } catch (error) { setNotice(error instanceof Error ? `Could not sign out: ${error.message}` : "Could not sign out. Please try again."); } }}><LogOut size={19}/><span>Sign out</span></button>}<small>© 2026 ZeeChat · Good vibes only</small></div>
     </aside>
     <section className="main-column">
 
