@@ -835,3 +835,45 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .sound-library-view{max-width:760px}.sound-library-view h1{font-size:38px;letter-spacing:-1.5px;margin:14px 0 8px}.sound-library-list{display:grid;gap:12px;margin-top:22px}.sound-library-card{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}.sound-library-card>div{display:grid;gap:6px;flex:1;min-width:0}.sound-library-card small{font-size:11px;color:var(--muted)}.sound-library-card audio{width:100%;height:32px;max-width:360px}.sound-icon{display:grid;place-items:center;flex:0 0 44px;height:44px;border-radius:13px;background:linear-gradient(140deg,#ff6ba633,#a88bff44);font-size:24px;color:var(--pink)}.audio-upload-label{display:flex!important;align-items:center;gap:12px;padding:12px;border:1px dashed var(--line);border-radius:12px;background:#14111b}.audio-upload-label>span{flex:1;min-width:0}.audio-upload-label small{display:block;color:var(--muted);font-size:11px;margin-top:4px}.audio-upload-label input{max-width:150px;font-size:11px}.audio-upload-label button{border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:7px}.live-reel-video{width:100%;height:100%;object-fit:cover}.reel-sound-audio{position:absolute;width:1px;height:1px;opacity:.01;pointer-events:none;bottom:0;left:0}
 @media(max-width:600px){.sound-library-card{align-items:flex-start;flex-wrap:wrap;gap:10px}.sound-library-card>div{width:calc(100% - 58px);flex:1}.sound-library-card>.create-button{margin-left:54px}.audio-upload-label{align-items:flex-start!important;flex-direction:column}.audio-upload-label input{max-width:100%;width:100%}}
 .sound-using-posts{display:grid;gap:5px;margin-top:8px}.sound-using-posts>button{justify-self:start;border:0;background:transparent;color:var(--pink);padding:3px 0;text-align:left;font-size:11px}.sound-using-posts>small{font-size:11px;color:var(--muted)}
+
+/* Reel layout correction: keep controls in their own safe zones and prevent collisions. */
+.reels-view.immersive-reels{width:100%;min-width:0;overflow:hidden}
+.reels-view.immersive-reels .reel-layout{width:100%;min-width:0;max-width:100%;overflow:hidden}
+.reels-view.immersive-reels .reel-player{isolation:isolate;min-width:0}
+.reels-view.immersive-reels .immersive-reel-header{min-width:0}
+.reels-view.immersive-reels .reel-feed-tabs{min-width:0;flex:1 1 auto}
+.reels-view.immersive-reels .reel-feed-tabs button{flex:0 1 auto}
+.reels-view.immersive-reels .reel-caption{overflow-wrap:anywhere;word-break:break-word}
+.reels-view.immersive-reels .reel-video-controls{top:calc(105px + env(safe-area-inset-top));bottom:auto;left:12px;right:76px;z-index:4}
+.reels-view.immersive-reels .reel-comments-panel{position:fixed!important;left:50%!important;right:auto!important;bottom:calc(72px + env(safe-area-inset-bottom))!important;transform:translateX(-50%)!important;width:min(560px,calc(100vw - 24px))!important;max-height:min(62dvh,560px)!important;overflow:hidden!important;z-index:100!important;display:flex!important;flex-direction:column!important;border:1px solid #ffffff24!important;border-radius:20px!important;background:#101716f5!important;box-shadow:0 18px 70px #000a!important;backdrop-filter:blur(20px)!important}
+.reels-view.immersive-reels .reel-comments-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;padding:14px 16px;border-bottom:1px solid #ffffff18}
+.reels-view.immersive-reels .reel-comments-list{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:12px 16px;flex:1 1 auto}
+.reels-view.immersive-reels .reel-comments-panel form{display:flex;gap:8px;flex:0 0 auto;padding:12px;border-top:1px solid #ffffff18;background:#101716}
+.reels-view.immersive-reels .reel-comments-panel form input{min-width:0;flex:1}
+@media(max-width:600px){
+ .reels-view.immersive-reels{height:calc(100dvh - 62px - env(safe-area-inset-bottom))!important;min-height:0!important;padding:0!important;margin:0!important}
+ .reels-view.immersive-reels .reel-layout{height:100%!important;margin:0!important}
+ .reels-view.immersive-reels .reel-player{inset:0!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;border-radius:0!important}
+ .reels-view.immersive-reels .live-reel-video{object-fit:contain!important;background:#050707!important}
+ .reels-view.immersive-reels .immersive-reel-header{left:0!important;right:0!important;padding-left:10px!important;padding-right:10px!important;gap:6px!important}
+ .reels-view.immersive-reels .immersive-brand{max-width:68px!important}
+ .reels-view.immersive-reels .reel-feed-tabs{justify-content:space-evenly!important;gap:clamp(4px,1.6vw,10px)!important}
+ .reels-view.immersive-reels .reel-feed-tabs button{font-size:clamp(10px,3vw,12px)!important}
+ .reels-view.immersive-reels .immersive-search{flex:0 0 34px!important;width:34px!important;height:34px!important}
+ .reels-view.immersive-reels .reel-video-controls{top:calc(96px + env(safe-area-inset-top))!important;bottom:auto!important;left:10px!important;right:64px!important;padding:7px!important}
+ .reels-view.immersive-reels .reel-caption{left:12px!important;right:64px!important;bottom:calc(12px + env(safe-area-inset-bottom))!important;padding:24px 0 0!important;max-height:34%!important;overflow:hidden!important}
+ .reels-view.immersive-reels .reel-caption p{-webkit-line-clamp:2!important;font-size:12px!important}
+ .reels-view.immersive-reels .reel-caption strong{font-size:10px!important}
+ .reels-view.immersive-reels .sound-line{max-width:100%!important}
+ .reels-view.immersive-reels .reel-actions{right:5px!important;bottom:calc(12px + env(safe-area-inset-bottom))!important;width:46px!important;gap:8px!important}
+ .reels-view.immersive-reels .reel-actions>button{min-height:39px!important;gap:3px!important}
+ .reels-view.immersive-reels .action-circle{width:34px!important;height:34px!important}
+ .reels-view.immersive-reels .reel-actions>button svg{width:18px!important;height:18px!important}
+ .reels-view.immersive-reels .reel-actions>button b{font-size:9px!important}
+ .reels-view.immersive-reels .reel-comments-panel{bottom:calc(68px + env(safe-area-inset-bottom))!important;max-height:58dvh!important}
+}
+@media(max-width:360px){
+ .reels-view.immersive-reels .immersive-brand>span:last-child{display:none!important}
+ .reels-view.immersive-reels .reel-caption{right:58px!important}
+ .reels-view.immersive-reels .reel-actions{right:2px!important;width:43px!important}
+}
