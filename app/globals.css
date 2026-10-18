@@ -705,3 +705,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 }
 @media(max-width:350px){.chat-contact-avatar{width:38px;height:38px;flex-basis:38px}.chat-contact b{font-size:13px}.chat-contact small{font-size:10px}.chat-emoji-button{display:none}.chat-message-content{max-width:86%}}
 @media(prefers-reduced-motion:reduce){.chat-send-button{transition:none}}
+
+
+.creator-profile-trigger{padding:0;border:0;cursor:pointer;font:inherit;transition:transform .16s ease,filter .16s ease}
+.creator-profile-trigger:active{transform:scale(.94)}
+.creator-preview-back{display:inline-flex;align-items:center;gap:7px;margin:0 0 12px;padding:9px 12px;border:1px solid #293532;border-radius:12px;background:#111918;color:#dce9e2;font-size:13px}
+.creator-preview-actions{display:flex;justify-content:center;gap:10px;margin:18px auto 12px}
+.creator-preview-note{max-width:420px;margin:16px auto!important;color:#87978f!important;font-size:11px!important;line-height:1.5}
+@media(prefers-reduced-motion:reduce){.creator-profile-trigger{transition:none}}
