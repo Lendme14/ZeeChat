@@ -130,8 +130,35 @@ export default function HomePage() {
         if (user) {
           void loadInbox(user.id);
           const { data: profileData } = await supabase.from("zeechat_profiles").select("username,display_name,bio,avatar_url,cover_url").eq("user_id", user.id).maybeSingle();
-          if (active && profileData) setProfile(profileData as ProfileSummary);
-          else if (active) setProfile(null);
+          if (!active) return;
+          if (profileData) {
+            setProfile(profileData as ProfileSummary);
+          } else {
+            // Existing Zonix accounts may predate ZeeChat's profile trigger. Provision a
+            // ZeeChat-only profile for this authenticated user without touching Zonix profiles.
+            const metadata = user as typeof user & { user_metadata?: Record<string, unknown> };
+            const metadataUsername = typeof metadata.user_metadata?.username === "string" ? metadata.user_metadata.username : "";
+            const emailPrefix = (user.email ?? "member").split("@")[0];
+            const baseUsername = (metadataUsername || emailPrefix).toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 17) || "member";
+            const username = `${baseUsername}_${user.id.slice(0, 6)}`;
+            const metadataDisplayName = typeof metadata.user_metadata?.display_name === "string" ? metadata.user_metadata.display_name : "";
+            const displayName = metadataDisplayName.trim() || emailPrefix || "ZeeChat member";
+            const { data: createdProfile, error: profileCreateError } = await supabase
+              .from("zeechat_profiles")
+              .upsert({ user_id: user.id, username, display_name: displayName, bio: "", is_private: false }, { onConflict: "user_id", ignoreDuplicates: true })
+              .select("username,display_name,bio,avatar_url,cover_url")
+              .maybeSingle();
+            if (profileCreateError) {
+              console.error("Could not provision ZeeChat profile for authenticated account", profileCreateError);
+              setProfile(null);
+              setNotice("You're signed in, but your ZeeChat profile could not be created. Please try refreshing.");
+            } else if (createdProfile) {
+              setProfile(createdProfile as ProfileSummary);
+            } else {
+              const { data: refreshedProfile } = await supabase.from("zeechat_profiles").select("username,display_name,bio,avatar_url,cover_url").eq("user_id", user.id).maybeSingle();
+              setProfile(refreshedProfile as ProfileSummary | null);
+            }
+          }
         } else {
           setProfile(null);
           setInboxConversations([]);
