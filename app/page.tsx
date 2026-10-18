@@ -210,7 +210,7 @@ export default function HomePage() {
       });
       unsubscribeAuth = () => authListener.subscription.unsubscribe();
       supabase.from("zeechat_sounds").select("id,creator_id,title,audio_url,source_post_id,created_at").order("created_at", { ascending: false }).limit(100).then(({data}) => { if (active && data) setSounds(data as ZeeSound[]); });
-      supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,sound_id,is_reel").eq("visibility", "public").order("created_at", { ascending: false }).limit(10)
+      supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,sound_id,is_reel").eq("visibility", "public").order("created_at", { ascending: false }).limit(200)
         .then(async ({ data, error }) => {
           if (!active) return;
           if (error) { setNotice("Connect Supabase to load live posts."); return; }
