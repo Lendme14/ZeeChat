@@ -265,7 +265,10 @@ export default function HomePage() {
       const latest: Record<string, LiveMessage> = {}; for (const message of (messages ?? []) as LiveMessage[]) if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
       const profileById: Record<string, {username:string;display_name:string;avatar_url:string|null}> = {}; for (const p of profiles ?? []) profileById[p.user_id] = p;
       setInboxConversations((members ?? []).map(member => { const p=profileById[member.user_id]; const last=latest[member.conversation_id]; return {id:member.conversation_id,otherUserId:member.user_id,username:p?.username ?? "member",displayName:p?.display_name ?? "ZeeChat member",avatarUrl:p?.avatar_url ?? null,lastMessage:last?.body ?? "Say hello 👋",lastAt:last?.created_at ?? null}; }).filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index).sort((a,b)=>(b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
-    } catch (error) { console.error("Unable to load ZeeChat inbox", error); }
+    } catch (error) {
+      console.error("Unable to load ZeeChat inbox", error);
+      setNotice(error instanceof Error ? `Inbox could not refresh: ${error.message}` : "Inbox could not refresh. Check your connection and try again.");
+    }
   }
 
   async function openLiveConversation(targetUserId: string, targetUsername: string, targetInitial: string) {
