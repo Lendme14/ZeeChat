@@ -121,7 +121,7 @@ export default function HomePage() {
   const liveReels = posts.filter(post => (post.is_reel || post.post_type === "reel" || post.post_type === "video") && Boolean(post.media_url));
   const followedCreatorIds = new Set(Object.entries(creatorFollowState).filter(([, isFollowing]) => isFollowing).map(([username]) => username));
   const feedReels = reelFeedMode === "following" ? liveReels.filter(post => followedCreatorIds.has(postAuthors[post.author_id]?.username || "")) : reelFeedMode === "live" ? [] : liveReels;
-  const selectedLiveReel = (activeReelPostId ? liveReels.find(post => post.id === activeReelPostId) : undefined) || liveReels[0];
+  const selectedLiveReel = (activeReelPostId ? feedReels.find(post => post.id === activeReelPostId) : undefined) || feedReels[0];
   const reel = selectedLiveReel ? { user: postAuthors[selectedLiveReel.author_id]?.username || "zeechatter", caption: selectedLiveReel.caption, tags: "", sound: "original audio", image: "", likes: "0", comments: "0", initial: (postAuthors[selectedLiveReel.author_id]?.display_name || "Z").slice(0, 1).toUpperCase(), mediaUrl: selectedLiveReel.media_url || "", postId: selectedLiveReel.id } : { ...sampleReels[index], mediaUrl: "", postId: "" };
 
   useEffect(() => {
@@ -132,13 +132,16 @@ export default function HomePage() {
   }, [mediaFile]);
 
   function moveReel(direction: 1 | -1) {
-    if (liveReels.length) {
-      const currentIndex = Math.max(0, liveReels.findIndex(post => post.id === activeReelPostId));
-      const nextIndex = (currentIndex + direction + liveReels.length) % liveReels.length;
+    if (feedReels.length) {
+      const foundIndex = feedReels.findIndex(post => post.id === activeReelPostId);
+      const currentIndex = foundIndex < 0 ? 0 : foundIndex;
+      const nextIndex = (currentIndex + direction + feedReels.length) % feedReels.length;
       setActiveReelPostId(feedReels[nextIndex]?.id ?? null);
       setReelCurrentTime(0);
       setReelDuration(0);
-    } else setIndex(current => (current + direction + sampleReels.length) % sampleReels.length);
+    } else if (reelFeedMode === "for-you") {
+      setIndex(current => (current + direction + sampleReels.length) % sampleReels.length);
+    }
   }
 
   function handleReelTouchStart(event: React.TouchEvent<HTMLDivElement>) {
@@ -472,6 +475,40 @@ export default function HomePage() {
       setNotice(error instanceof Error ? error.message : "Could not update follow status.");
     } finally { setFollowBusy(false); }
   }
+
+  useEffect(() => {
+    if (!userId) {
+      setCreatorFollowState({});
+      return;
+    }
+    let active = true;
+    const loadFollowedCreators = async () => {
+      try {
+        const supabase = createClient();
+        const { data: follows, error } = await supabase
+          .from("zeechat_follows")
+          .select("followed_id")
+          .eq("follower_id", userId);
+        if (error) throw error;
+        const followedIds = [...new Set((follows ?? []).map(row => row.followed_id as string))];
+        if (!followedIds.length) {
+          if (active) setCreatorFollowState({});
+          return;
+        }
+        const { data: creators, error: creatorsError } = await supabase
+          .from("zeechat_profiles")
+          .select("username,user_id")
+          .in("user_id", followedIds);
+        if (creatorsError) throw creatorsError;
+        if (!active) return;
+        setCreatorFollowState(Object.fromEntries((creators ?? []).map(creator => [creator.username, true])));
+      } catch (error) {
+        console.error("Could not load followed ZeeChat creators", error);
+      }
+    };
+    void loadFollowedCreators();
+    return () => { active = false; };
+  }, [userId]);
 
   async function loadCreatorFollowState(username: string) {
     if (!userId) return;
