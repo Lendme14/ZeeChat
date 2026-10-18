@@ -877,3 +877,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
  .reels-view.immersive-reels .reel-caption{right:58px!important}
  .reels-view.immersive-reels .reel-actions{right:2px!important;width:43px!important}
 }
+
+
+/* Clear, restrained destructive actions for user-owned content */
+.content-delete-button{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:5px 9px;border:1px solid #e56d7c66;border-radius:9px;background:#e34e6014;color:#ff9ba7;font-size:11px;font-weight:700;white-space:nowrap}
+.content-delete-button:hover{border-color:#ff7b8a;background:#e34e6028}
+.content-delete-button:focus-visible{outline:2px solid #ff9ba7;outline-offset:2px}
+.comment-delete-button{float:right;min-height:24px;padding:3px 7px;font-size:10px}
+.sound-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sound-card-actions .create-button{white-space:nowrap}
+.reel-caption .reel-delete-button{margin-top:8px}
+@media(max-width:600px){.sound-card-actions{width:100%;padding-left:54px}.sound-card-actions .create-button{flex:1}.content-delete-button{min-height:32px}}
