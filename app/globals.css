@@ -823,7 +823,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 /* Profile gallery thumbnails: render media as square tiles with a video play affordance */
 .profile-post-thumbnail,.profile-post-thumbnail-image{position:relative;display:block;width:100%;aspect-ratio:1/1;overflow:hidden;border:0;padding:0;background:#090d10;}
 .profile-post-thumbnail{cursor:pointer;}
-.profile-post-thumbnail img,.profile-post-thumbnail-image{width:100%;height:100%;object-fit:cover;}
+.profile-post-thumbnail img,.profile-post-thumbnail video,.profile-post-thumbnail-image{width:100%;height:100%;object-fit:cover;}
 .profile-post-thumbnail>span{position:absolute;inset:0;display:grid;place-items:center;color:#fff;background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.35));pointer-events:none;}
 .profile-post-thumbnail>span svg{filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));}
 .profile-post-item p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
