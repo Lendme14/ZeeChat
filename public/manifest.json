@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "ZeeChat — Find your people",
+  "short_name": "ZeeChat",
+  "description": "Discover creators, conversations and little adventures picked for your vibe.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0f11",
+  "theme_color": "#0b0f11",
+  "categories": [
+    "social",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "/icons/zeechat.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
