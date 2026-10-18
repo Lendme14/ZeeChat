@@ -786,3 +786,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .reel-scrubber::-moz-range-thumb{width:10px;height:10px;border:2px solid #fff;border-radius:50%;background:#4ce0a5}
 .reel-scrubber:focus-visible{outline:2px solid #4ce0a5;outline-offset:3px;border-radius:8px}
 @media(max-width:600px){.reel-video-controls{left:8px;right:8px;bottom:8px;padding:8px 8px 6px}.reel-scrubber-row{gap:6px;font-size:9px}.reel-scrubber{height:28px}}
+
+
+/* Fix live Reel video sizing: fill the entire immersive player, not its intrinsic video dimensions. */
+@media(max-width:600px){
+  .immersive-reels .reel-layout .reel-player{position:absolute!important;inset:0 0 calc(62px + env(safe-area-inset-bottom)) 0!important;width:100%!important;height:auto!important;min-height:0!important;overflow:hidden!important;}
+  .immersive-reels .reel-player>.live-reel-video{position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:contain!important;object-position:center center!important;border-radius:0!important;background:#050708!important;z-index:1!important;}
+  .immersive-reels .reel-player>.reel-video-controls{position:absolute!important;left:10px!important;right:10px!important;bottom:10px!important;z-index:6!important;}
+  .immersive-reels .reel-player>.immersive-reel-header{z-index:4!important;}
+  .immersive-reels .reel-player>.reel-caption{z-index:4!important;}
+  .immersive-reels .reel-player>.reel-actions{z-index:5!important;}
+  .immersive-reels .reel-player>.sound-button{z-index:5!important;}
+}
+@media(min-width:601px){
+  .reels-view.immersive-reels .reel-player>.live-reel-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:contain!important;}
+}
