@@ -71,6 +71,8 @@ export default function HomePage() {
     { id: 4, text: "That sounds good 😊", mine: true, time: "10:45 AM" },
   ]);
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadLabel, setUploadLabel] = useState("");
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const liveReels = posts.filter(post => (post.post_type === "reel" || post.post_type === "video") && Boolean(post.media_url));
   const selectedLiveReel = activeReelPostId ? liveReels.find(post => post.id === activeReelPostId) : undefined;
@@ -314,12 +316,42 @@ export default function HomePage() {
     });
   }
 
+
+  function uploadWithProgress(path: string, file: File | Blob, contentType: string, onProgress: (percent: number) => void): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const supabase = createClient();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session?.access_token) throw new Error("Your session expired. Sign in again to upload.");
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/object/zeechat-media/" + path.split("/").map(encodeURIComponent).join("/"));
+        xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+        xhr.setRequestHeader("Authorization", "Bearer " + session.access_token);
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.setRequestHeader("x-upsert", "false");
+        xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress(Math.min(99, Math.round(event.loaded / event.total * 100))); };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) { onProgress(100); resolve(); }
+          else { try { const body = JSON.parse(xhr.responseText); reject(new Error(body.message || body.error || "Upload failed (" + xhr.status + ").")); } catch { reject(new Error("Upload failed (" + xhr.status + ").")); } }
+        };
+        xhr.onerror = () => reject(new Error("Network error while uploading. Please try again."));
+        xhr.onabort = () => reject(new Error("Upload was interrupted."));
+        xhr.send(file);
+      } catch (error) { reject(error); }
+    });
+  }
+
   async function publish() {
     if (!caption.trim() && !mediaFile) return;
     if (!userId) { setNotice("Sign in first to publish a post."); return; }
     setBusy(true);
+    setUploadProgress(mediaFile?.type.startsWith("video/") ? 0 : null);
+    setUploadLabel(mediaFile?.type.startsWith("video/") ? "Preparing your Reel…" : "Uploading your post…");
+    setCreateOpen(false);
     const supabase = createClient();
     const uploadedPaths: string[] = [];
+    let postInserted = false;
     try {
       let mediaUrl: string | null = null;
       let thumbnailUrl: string | null = null;
@@ -332,16 +364,17 @@ export default function HomePage() {
         if (mediaFile.size > maxBytes) throw new Error(isVideo ? "Choose a video smaller than 100 MB." : "Choose an image smaller than 8 MB.");
         const extension = mediaFile.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
         const path = userId + "/" + crypto.randomUUID() + "." + extension;
-        const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(path, mediaFile, { contentType: mediaFile.type, upsert: false });
-        if (uploadError) throw uploadError;
+        setUploadLabel(isVideo ? "Uploading video…" : "Uploading photo…");
+        setUploadProgress(0);
+        await uploadWithProgress(path, mediaFile, mediaFile.type, setUploadProgress);
         uploadedPaths.push(path);
         mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(path).data.publicUrl;
         publishedType = isVideo ? "reel" : "image";
         if (isVideo) {
           const thumbnail = await createVideoThumbnail(mediaFile);
           const thumbnailPath = userId + "/" + crypto.randomUUID() + ".jpg";
-          const { error: thumbError } = await supabase.storage.from("zeechat-media").upload(thumbnailPath, thumbnail, { contentType: "image/jpeg", upsert: false });
-          if (thumbError) throw thumbError;
+          setUploadLabel("Finishing Reel thumbnail…");
+          await uploadWithProgress(thumbnailPath, thumbnail, "image/jpeg", () => {});
           uploadedPaths.push(thumbnailPath);
           thumbnailUrl = supabase.storage.from("zeechat-media").getPublicUrl(thumbnailPath).data.publicUrl;
         }
@@ -349,7 +382,9 @@ export default function HomePage() {
       if (postKind === "reel" && !mediaFile?.type.startsWith("video/")) throw new Error("Choose a video to publish a Reel.");
       const { data: createdPost, error } = await supabase.from("zeechat_posts").insert({ author_id: userId, caption: caption.trim(), post_type: publishedType === "text" ? "text" : (postKind === "reel" ? "reel" : publishedType), media_url: mediaUrl, thumbnail_url: thumbnailUrl, visibility: "public" }).select("id").single();
       if (error) throw error;
-      setCaption(""); setMediaFile(null); setPostKind("post"); setCreateOpen(false); setNotice(postKind === "reel" ? "Your Reel is live and its thumbnail is on Home!" : "Your post is live!");
+      postInserted = true;
+      setUploadProgress(null); setUploadLabel("");
+      setCaption(""); setMediaFile(null); setPostKind("post"); setNotice(postKind === "reel" ? "Your Reel is live and its thumbnail is on Home!" : "Your post is live!");
       const { data, error: refreshError } = await supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url").eq("visibility", "public").order("created_at", { ascending: false }).limit(10);
       if (refreshError) throw new Error("Your post was published, but Home could not refresh. Reload the page to see it.");
       const refreshedPosts = (data ?? []) as Post[];
@@ -365,7 +400,8 @@ export default function HomePage() {
       }
       if (postKind === "reel" && createdPost) { setActiveReelPostId(createdPost.id); setView("Reels"); }
     } catch (error) {
-      if (uploadedPaths.length) await supabase.storage.from("zeechat-media").remove(uploadedPaths).catch(() => undefined);
+      if (!postInserted && uploadedPaths.length) await supabase.storage.from("zeechat-media").remove(uploadedPaths).catch(() => undefined);
+      setUploadProgress(null); setUploadLabel("");
       setNotice(error instanceof Error ? error.message : "Could not publish. Check your connection and try again.");
     } finally { setBusy(false); }
   }
@@ -380,6 +416,10 @@ export default function HomePage() {
     <section className="main-column">
 
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
+      {uploadProgress !== null && <div className="upload-progress-card" role="status" aria-live="polite">
+        <div className="upload-progress-ring" style={{background: `conic-gradient(#45d6a0 ${uploadProgress * 3.6}deg, #263a33 0deg)`}} aria-label={`Upload ${uploadProgress}% complete`}><span>{uploadProgress}%</span></div>
+        <div className="upload-progress-copy"><b>{uploadLabel || "Publishing your video…"}</b><small>You can keep browsing ZeeChat while this finishes.</small><div className="upload-progress-track"><span style={{width: uploadProgress + "%"}}/></div></div>
+      </div>}
       {view === "Home" && <section className="home-feed-view"><div className="home-feed-heading"><div><span className="eyebrow">YOUR COMMUNITY</span><h1>Home <span className="home-heading-chevron">⌄</span></h1></div><div className="home-feed-actions"><button className="home-watch-reels" onClick={() => setView("Reels")}><Video size={16}/><span>Reels</span></button><button aria-label="Search" onClick={() => setView("Discover")}><Search size={19}/></button><button aria-label="Notifications" onClick={() => setNotice("Notifications will appear here when activity alerts are connected.")}><Sparkles size={18}/></button></div></div><div className="home-story-strip"><button className="home-story-add" onClick={() => setCreateOpen(true)}><span>＋</span><small>Your story</small></button>{[{name:"Karma Hossain",initial:"K"},{name:"Mira James",initial:"M"},{name:"Jay Creates",initial:"J"},{name:"Tomi Laughs",initial:"T"},{name:"Amara",initial:"A"},{name:"David",initial:"D"}].map((person,i)=><button key={person.name} className="home-story" onClick={() => setNotice("Stories are a visual preview and are not published yet.")}><span className={"home-story-avatar tone-"+i}>{person.initial}</span><small>{person.name.split(" ")[0]}</small></button>)}</div><section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id}><div className="post-avatar">{postAuthors[p.author_id]?.avatar_url ? <img className="post-avatar-image" src={postAuthors[p.author_id].avatar_url!} alt="" /> : (postAuthors[p.author_id]?.display_name?.[0] || postAuthors[p.author_id]?.username?.[0] || "z").toUpperCase()}</div><div className="post-body"><b>{postAuthors[p.author_id]?.display_name || postAuthors[p.author_id]?.username || "ZeeChat member"} <span className="post-username">{postAuthors[p.author_id]?.username ? `@${postAuthors[p.author_id].username}` : ""}</span></b><small>{new Date(p.created_at).toLocaleString()}</small>{p.caption && <p>{p.caption}</p>}{p.post_type === "reel" && p.media_url ? <button type="button" className="home-reel-thumbnail" onClick={() => { setActiveReelPostId(p.id); setView("Reels"); }} aria-label="Play Reel"><img className="community-post-image" src={p.thumbnail_url || p.media_url} alt="Reel thumbnail" loading="lazy" /><span className="home-reel-play"><Video size={25} fill="currentColor"/></span><small>PLAY REEL</small></button> : p.media_url && p.post_type !== "video" ? <img className="community-post-image" src={p.media_url} alt="Image shared in a ZeeChat post" loading="lazy" /> : null}<div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small><p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">No community posts yet. Be the first to share something.</p>}</section></section>}
       {view === "Reels" && <section className="reels-view immersive-reels">
         <div className="reel-layout"><div key={reel.user} className="reel-player reel-enter" data-reel-index={index} onTouchStart={handleReelTouchStart} onTouchEnd={handleReelTouchEnd} onWheel={event => { if (Math.abs(event.deltaY) < 18) return; const now = Date.now(); if (now - lastWheelAt.current < 520) return; lastWheelAt.current = now; setIndex(current => Math.max(0, Math.min(sampleReels.length - 1, current + (event.deltaY > 0 ? 1 : -1)))); }} onKeyDown={event => { if (event.key === "ArrowDown") setIndex(current => (current + 1) % sampleReels.length); if (event.key === "ArrowUp") setIndex(current => (current - 1 + sampleReels.length) % sampleReels.length); }} tabIndex={0} aria-label="Reel viewer. Swipe up or down to change videos." style={!reel.mediaUrl ? { backgroundImage: `linear-gradient(0deg,#08070ddf,transparent 55%,#08070d55),url(https://images.unsplash.com/${reel.image}?auto=format&fit=crop&w=1000&q=85)` } : undefined}>{reel.mediaUrl && <video className="live-reel-video" src={reel.mediaUrl} controls autoPlay playsInline loop poster={selectedLiveReel?.thumbnail_url || undefined} onClick={event => event.stopPropagation()} /> }
