@@ -240,7 +240,9 @@ export default function HomePage() {
     if (!displayName) { setNotice("Please enter a display name."); return; }
     setProfileSaving(true);
     try {
-      const supabase = createClient();\n      const { data, error } = await supabase.from("zeechat_profiles").update({ display_name: displayName, bio }).eq("user_id", userId).select("username,display_name,bio,avatar_url,cover_url").maybeSingle();\n      if (!error && !data) throw new Error("Your ZeeChat profile was not found. Sign out and back in to recreate your profile, then try again.");
+      const supabase = createClient(); 
+      const { data, error } = await supabase.from("zeechat_profiles").update({ display_name: displayName, bio }).eq("user_id", userId).select("username,display_name,bio,avatar_url,cover_url").maybeSingle();
+      if (!error && !data) throw new Error("Your ZeeChat profile was not found. Sign out and back in to recreate your profile, then try again.");
       if (error) throw error;
       setProfile(data as ProfileSummary);
       setEditProfileOpen(false);
