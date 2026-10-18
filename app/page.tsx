@@ -481,10 +481,11 @@ export default function HomePage() {
       const supabase = createClient();
       const { error } = await supabase.from("zeechat_posts").delete().eq("id", post.id).eq("author_id", userId);
       if (error) throw error;
-      const paths = [storageObjectPath(post.media_url), storageObjectPath(post.thumbnail_url)].filter((p): p is string => Boolean(p && p.startsWith(userId + "/")));
+      const paths = [...new Set([storageObjectPath(post.media_url), storageObjectPath(post.thumbnail_url)].filter((p): p is string => Boolean(p && p.startsWith(userId + "/"))))];
+      let mediaCleanupFailed = false;
       if (paths.length) {
         const { error: storageError } = await supabase.storage.from("zeechat-media").remove(paths);
-        if (storageError) console.warn("Post deleted, but some media files could not be removed", storageError);
+        if (storageError) { mediaCleanupFailed = true; console.warn("Post deleted, but some media files could not be removed", storageError); }
       }
       setPosts(items => items.filter(item => item.id !== post.id));
       setOpenCommentPostIds(ids => ids.filter(id => id !== post.id));
@@ -493,7 +494,7 @@ export default function HomePage() {
       setPostLikeCounts(items => { const next = { ...items }; delete next[post.id]; return next; });
       setLikedPostIds(ids => ids.filter(id => id !== post.id));
       if (activeReelPostId === post.id) setActiveReelPostId(null);
-      setNotice("Post deleted.");
+      setNotice(mediaCleanupFailed ? "Post deleted, but its media could not be fully removed. Please retry cleanup later." : "Post deleted.");
     } catch (error) {
       setNotice(error instanceof Error ? "Could not delete post: " + error.message : "Could not delete post. Please try again.");
     } finally { setBusy(false); }
@@ -523,14 +524,15 @@ export default function HomePage() {
       const { error } = await supabase.from("zeechat_sounds").delete().eq("id", sound.id).eq("creator_id", userId);
       if (error) throw error;
       const path = storageObjectPath(sound.audio_url);
+      let audioCleanupFailed = false;
       if (path && path.startsWith(userId + "/")) {
         const { error: storageError } = await supabase.storage.from("zeechat-media").remove([path]);
-        if (storageError) console.warn("Sound deleted, but audio storage cleanup failed", storageError);
+        if (storageError) { audioCleanupFailed = true; console.warn("Sound deleted, but audio storage cleanup failed", storageError); }
       }
       setSounds(items => items.filter(item => item.id !== sound.id));
       setPosts(items => items.map(item => item.sound_id === sound.id ? { ...item, sound_id: null } : item));
       if (selectedSound?.id === sound.id) setSelectedSound(null);
-      setNotice("Sound deleted.");
+      setNotice(audioCleanupFailed ? "Sound deleted, but its audio file could not be removed. Please retry cleanup later." : "Sound deleted.");
     } catch (error) {
       setNotice(error instanceof Error ? "Could not delete sound: " + error.message : "Could not delete sound.");
     }
