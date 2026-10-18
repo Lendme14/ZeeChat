@@ -512,3 +512,54 @@ button:disabled{cursor:not-allowed;opacity:.58}
 }
 @media(max-width:350px){.discover-category{gap:6px;padding:9px 7px;font-size:11px}.discover-category-icon{width:27px;height:27px;flex-basis:27px;font-size:15px}}
 @media(prefers-reduced-motion:reduce){.discover-category{transition:none}}
+
+
+/* Final mobile navigation pass: five balanced destinations, clear accent, safe-area aware */
+@media(max-width:600px){
+  .app-shell{padding-bottom:calc(68px + env(safe-area-inset-bottom))!important}
+  .mobile-nav{
+    box-sizing:content-box!important;
+    min-height:0!important;
+    height:58px!important;
+    padding:5px 7px calc(5px + env(safe-area-inset-bottom))!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    align-items:center!important;
+    gap:2px!important;
+    background:#f4f7f5!important;
+    border-top:1px solid #e0e8e3!important;
+    box-shadow:0 -5px 22px #07150e0a!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
+  .mobile-nav button{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:4px!important;
+    width:100%!important;
+    min-width:0!important;
+    min-height:46px!important;
+    padding:3px 1px!important;
+    color:#7c8781!important;
+    font-size:10px!important;
+    font-weight:650!important;
+    line-height:1.1!important;
+    white-space:nowrap!important;
+  }
+  .mobile-nav button.active{color:#078765!important;font-weight:800!important}
+  .mobile-nav button.active::before{display:none!important}
+  .mobile-nav button svg{width:20px!important;height:20px!important;flex:0 0 auto!important;stroke-width:1.9!important}
+  .mobile-nav .post-nav-button{gap:2px!important;color:#7c8781!important}
+  .mobile-nav .post-nav-orbit{
+    width:39px!important;height:39px!important;flex:0 0 39px!important;
+    margin:0 0 -1px!important;transform:none!important;
+    border:2px solid #f4f7f5!important;border-radius:14px!important;
+    background:#20c997!important;color:#063d2e!important;
+    box-shadow:0 3px 9px #0a9d7530!important;
+  }
+  .mobile-nav .post-nav-orbit svg{width:21px!important;height:21px!important}
+  .mobile-nav .post-nav-button>span:last-child{font-size:10px!important;font-weight:700!important;line-height:1.1!important}
+  .mobile-nav .post-nav-button:active .post-nav-orbit{transform:scale(.96)!important}
+}
+@media(min-width:601px){.mobile-nav{display:none!important}}
