@@ -939,3 +939,87 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 @media(prefers-reduced-motion:reduce){
  .content-action-trigger{transition:none}
 }
+
+
+/* Desktop Reel stage: keep the portrait video centered, with a stable control rail.
+   Scoped to desktop so the existing immersive mobile Reel layout stays untouched. */
+@media (min-width: 901px) {
+  .immersive-reels {
+    width: 100%;
+    max-width: 1120px;
+    min-height: calc(100vh - 112px);
+    margin: 12px auto 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .immersive-reels .reel-layout {
+    width: min(100%, 960px);
+    max-width: 960px;
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 20px;
+    margin: 0 auto;
+    align-items: center;
+  }
+  .immersive-reels .reel-player {
+    width: 100%;
+    height: min(78vh, 760px);
+    min-height: 520px;
+    max-height: 760px;
+    aspect-ratio: 9 / 16;
+    justify-self: center;
+    background-color: #08070d;
+    background-position: center;
+    background-size: cover;
+    border-radius: 22px;
+  }
+  .immersive-reels .live-reel-video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #08070d;
+  }
+  .immersive-reels .immersive-reel-header {
+    display: flex;
+    position: relative;
+    z-index: 3;
+    width: min(100%, 960px);
+    margin: 0 auto 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .immersive-reels .reel-caption {
+    z-index: 2;
+    padding: 24px 20px 20px;
+    overflow-wrap: anywhere;
+  }
+  .immersive-reels .reel-actions {
+    align-self: center;
+    gap: 20px;
+  }
+  .immersive-reels .reel-actions .action-circle {
+    width: 48px;
+    height: 48px;
+  }
+  .immersive-reels .reel-video-controls {
+    position: absolute;
+    z-index: 4;
+    left: 14px;
+    right: 14px;
+    bottom: 12px;
+  }
+  .immersive-reels .reel-scrubber-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #fff;
+    font-size: 10px;
+    text-shadow: 0 1px 4px #000;
+  }
+  .immersive-reels .reel-scrubber {
+    min-width: 0;
+    flex: 1;
+    accent-color: #4ee6c1;
+  }
+}
