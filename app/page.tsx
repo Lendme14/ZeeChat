@@ -53,7 +53,8 @@ export default function HomePage() {
   const [bioDraft, setBioDraft] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const [activeChat, setActiveChat] = useState(false);\n  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);\n  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);\n  const [inboxConversations, setInboxConversations] = useState<InboxConversation[]>([]);\n  const [chatLoading, setChatLoading] = useState(false);
+  const [activeChat, setActiveChat] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);\n  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);\n  const [inboxConversations, setInboxConversations] = useState<InboxConversation[]>([]);\n  const [chatLoading, setChatLoading] = useState(false);
   const [selectedCreator, setSelectedCreator] = useState<{username:string;initial:string}|null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [demoMessages, setDemoMessages] = useState<{id:number; text:string; mine:boolean; time:string}[]>([
@@ -99,14 +100,25 @@ export default function HomePage() {
     let active = true;
     try {
       const supabase = createClient();
-      supabase.auth.getUser().then(async ({ data }) => {
+      const syncAuthUser = async (user: { id: string; email?: string } | null) => {
         if (!active) return;
-        setUserId(data.user?.id ?? null);
-        setUserEmail(data.user?.email ?? null);
-        if (data.user) {
-          const { data: profileData } = await supabase.from("zeechat_profiles").select("username,display_name,bio").eq("user_id", data.user.id).maybeSingle();
+        setUserId(user?.id ?? null);
+        setUserEmail(user?.email ?? null);
+        if (user) {
+          void loadInbox(user.id);
+          const { data: profileData } = await supabase.from("zeechat_profiles").select("username,display_name,bio").eq("user_id", user.id).maybeSingle();
           if (active && profileData) setProfile(profileData as ProfileSummary);
+          else if (active) setProfile(null);
+        } else {
+          setProfile(null);
+          setInboxConversations([]);
+          setActiveConversationId(null);
+          setActiveChat(false);
         }
+      };
+      supabase.auth.getUser().then(({ data }) => syncAuthUser(data.user ?? null));
+      const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        void syncAuthUser(session?.user ?? null);
       });
       supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url").eq("visibility", "public").order("created_at", { ascending: false }).limit(10)
         .then(async ({ data, error }) => {
