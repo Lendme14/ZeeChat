@@ -1196,7 +1196,7 @@ export default function HomePage() {
     }
     const today = localDateKey();
     const yesterday = localDateKey(new Date(Date.now() - 86400000));
-    const storageKey = \`zeechat-trivia-stats-\${userId ?? "guest"}\`;
+    const storageKey = `zeechat-trivia-stats-${userId ?? "guest"}`;
     const nextStats: TriviaStats = {
       bestScore: Math.max(triviaStats.bestScore, triviaScore),
       streak: triviaStats.lastPlayed === today ? triviaStats.streak : triviaStats.lastPlayed === yesterday ? triviaStats.streak + 1 : 1,
@@ -1209,7 +1209,7 @@ export default function HomePage() {
   }
 
   async function shareTriviaScore() {
-    const message = \`I scored \${triviaScore}/5 in today’s ZeeChat Quickfire Trivia! Can you beat me? \${window.location.origin}\`;
+    const message = `I scored ${triviaScore}/5 in today’s ZeeChat Quickfire Trivia! Can you beat me? ${window.location.origin}`;
     try {
       if (navigator.share) await navigator.share({ title: "ZeeChat Quickfire Trivia", text: message });
       else {
@@ -1300,7 +1300,7 @@ export default function HomePage() {
                 <span>QUESTION {triviaIndex + 1} OF {triviaQuestions.length}</span>
                 <span>✨ {triviaScore} {triviaScore === 1 ? "point" : "points"}</span>
               </div>
-              <div className="trivia-progress-track"><span style={{ width: \`\${((triviaIndex + (triviaAnswer !== null ? 1 : 0)) / triviaQuestions.length) * 100}%\` }}/></div>
+              <div className="trivia-progress-track"><span style={{ width: `${((triviaIndex + (triviaAnswer !== null ? 1 : 0)) / triviaQuestions.length) * 100}%` }}/></div>
               <h2>{triviaQuestions[triviaIndex].question}</h2>
               <div className="trivia-options">
                 {triviaQuestions[triviaIndex].options.map((option, optionIndex) => {
