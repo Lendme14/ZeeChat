@@ -1086,3 +1086,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
   .mobile-nav button{position:relative}
   .mobile-nav .unread-count-badge{position:absolute;top:2px;right:calc(50% - 25px);min-width:18px;height:18px;padding:0 4px;font-size:9px;box-shadow:0 0 0 2px #f4f7f5}
 }
+
+
+/* Per-conversation unread counts */
+.chat-demo-thread-copy .chat-demo-unread{flex-shrink:0;margin-left:auto;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#ff476f;color:#fff;font-size:10px;font-style:normal;line-height:20px;text-align:center;box-shadow:0 0 0 2px #111918}
+.chat-filter-row button{cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.chat-filter-row button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
