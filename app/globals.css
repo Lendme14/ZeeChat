@@ -1023,3 +1023,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
     accent-color: #4ee6c1;
   }
 }
+
+
+/* Reel engagement: compact view counter and expandable captions. */
+.reels-view.immersive-reels .reel-view-count{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#fff;font-size:11px;text-shadow:0 1px 5px #0008}
+.reels-view.immersive-reels .reel-view-count .action-circle{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#1118}
+.reels-view.immersive-reels .reel-view-count b{font-size:12px;line-height:1.1}
+.reels-view.immersive-reels .reel-view-count small{font-size:10px;opacity:.88}
+.reels-view.immersive-reels .reel-caption-heading>p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.reels-view.immersive-reels .reel-caption-heading.caption-expanded>p{display:block;overflow:visible}
+.reels-view.immersive-reels .reel-caption-toggle{margin-top:3px;padding:2px 0;border:0;background:transparent;color:#fff;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
