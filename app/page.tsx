@@ -126,13 +126,22 @@ export default function HomePage() {
   const liveReels = posts.filter(post => (post.is_reel || post.post_type === "reel" || post.post_type === "video") && Boolean(post.media_url));
   const followedCreatorIds = new Set(Object.entries(creatorFollowState).filter(([, isFollowing]) => isFollowing).map(([username]) => username));
   const recordPostView = useCallback((postId: string) => {
-    const storageKey = `zeechat-viewed-${postId}`;
+    const storageKey = `zeechat-viewed-${userId ?? "anonymous"}-${postId}`;
     try {
       if (sessionStorage.getItem(storageKey)) return;
       sessionStorage.setItem(storageKey, "1");
     } catch { /* Continue with a best-effort view if session storage is unavailable. */ }
+
+    let client: ReturnType<typeof createClient>;
+    try {
+      client = createClient();
+    } catch (error) {
+      console.error("Unable to initialize ZeeChat view tracking", error);
+      try { sessionStorage.removeItem(storageKey); } catch { /* Ignore unavailable storage. */ }
+      return;
+    }
+
     setPostViewCounts(current => ({ ...current, [postId]: (current[postId] ?? 0) + 1 }));
-    const client = createClient();
     void client.from("zeechat_post_views").insert({ post_id: postId, viewer_id: userId }).then(async ({ error }) => {
       if (error) {
         console.error("Unable to record ZeeChat post view", error);
