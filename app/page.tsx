@@ -14,7 +14,7 @@ type PostAuthor = { username: string; display_name: string; avatar_url?: string 
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; };
 type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null };
-type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
+type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like" | "caption_vote"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
 type InboxConversation = { id: string; otherUserId: string; username: string; displayName: string; avatarUrl: string | null; lastMessage: string; lastAt: string | null; unreadCount: number };
 const sampleReels = [
   { user: "mira.moves", caption: "POV: the group chat finally makes it outside 😂✨", tags: "#goodvibes #weekendenergy", sound: "original audio · Mira", image: "photo-1533174072545-7a4b6ad7a6c3", likes: "24.8K", comments: "1,204", initial: "M" },
@@ -642,7 +642,9 @@ export default function HomePage() {
       if (!error) setNotifications(current => current.map(row => row.id === item.id ? { ...row, read_at: now } : row));
     }
     setNotificationsOpen(false);
-    if (item.kind === "message") {
+    if (item.kind === "caption_vote") {
+      setView("Play");
+    } else if (item.kind === "message") {
       setActiveChat(false);
       setActiveConversationId(null);
       activeConversationRef.current = null;
@@ -1396,7 +1398,7 @@ export default function HomePage() {
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {notificationsOpen && <section className="notification-center" aria-label="Notifications" aria-live="polite">
         <header className="notification-center-header"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>Notifications</h2><p>{notifications.filter(item => !item.read_at).length ? `${notifications.filter(item => !item.read_at).length} unread` : "You’re all caught up"}</p></div><div className="notification-center-actions">{notifications.some(item => !item.read_at) && <button type="button" onClick={() => void markAllNotificationsRead()}>Mark all read</button>}<button type="button" className="notification-close" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}>×</button></div></header>
-        {!userId ? <p className="notification-empty">Sign in to see your notifications.</p> : notifications.length ? <div className="notification-list">{notifications.map(item => <button type="button" key={item.id} className={`notification-item ${item.read_at ? "" : "is-unread"}`} onClick={() => void openNotification(item)}><span className={`notification-kind-icon notification-kind-${item.kind}`}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">No notifications yet. New messages, follows, comments and likes will show up here.</p>}
+        {!userId ? <p className="notification-empty">Sign in to see your notifications.</p> : notifications.length ? <div className="notification-list">{notifications.map(item => <button type="button" key={item.id} className={`notification-item ${item.read_at ? "" : "is-unread"}`} onClick={() => void openNotification(item)}><span className={`notification-kind-icon notification-kind-${item.kind}`}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : item.kind === "caption_vote" ? <Sparkles size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">No notifications yet. New messages, follows, comments, likes and Caption Battle votes will show up here.</p>}
       </section>}
       {uploadProgress !== null && <div className="upload-progress-card" role="status" aria-live="polite">
         <div className="upload-progress-ring" style={{background: `conic-gradient(#45d6a0 ${uploadProgress * 3.6}deg, #263a33 0deg)`}} aria-label={`Upload ${uploadProgress}% complete`}><span>{uploadProgress}%</span></div>
