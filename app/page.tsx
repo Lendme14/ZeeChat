@@ -1563,7 +1563,7 @@ export default function HomePage() {
               <div className="trivia-rules">
                 <span><Check size={16}/> 5 multiple-choice questions</span>
                 <span><Check size={16}/> Instant answer explanations</span>
-                <span><Check size={16}/> Personal best and streak saved on this device</span>
+                <span><Check size={16}/> Personal best and streak sync across devices when signed in</span>
               </div>
               <button className="trivia-primary-button" onClick={startTrivia}>Start today&apos;s challenge <ArrowLeft size={17} className="trivia-start-arrow"/></button>
             </div>
