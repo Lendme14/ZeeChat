@@ -16,22 +16,17 @@ create index if not exists zeechat_post_views_viewer_post_idx
 alter table public.zeechat_post_views enable row level security;
 
 drop policy if exists "Read views on readable ZeeChat posts" on public.zeechat_post_views;
-create policy "Read views on readable ZeeChat posts"
-  on public.zeechat_post_views for select to anon, authenticated
-  using (exists (
-    select 1 from public.zeechat_posts p
-    where p.id = post_id
-  ));
-
 drop policy if exists "Record ZeeChat post views" on public.zeechat_post_views;
 create policy "Record ZeeChat post views"
   on public.zeechat_post_views for insert to anon, authenticated
   with check (
-    (viewer_id is null or viewer_id = auth.uid())
+    (viewer_id is null or viewer_id = (select auth.uid()))
     and exists (
       select 1 from public.zeechat_posts p
       where p.id = post_id
     )
   );
 
-grant select, insert on public.zeechat_post_views to anon, authenticated;
+-- Raw view rows contain user IDs and timestamps; expose inserts only.
+revoke all on public.zeechat_post_views from anon, authenticated;
+grant insert on public.zeechat_post_views to anon, authenticated;
