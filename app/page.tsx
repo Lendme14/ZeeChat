@@ -579,6 +579,7 @@ export default function HomePage() {
       void supabase.from("zeechat_notifications").update({ read_at: readAt }).eq("recipient_id", userId).eq("entity_id", item.id).eq("kind", "message").is("read_at", null);
       setNotifications(current => current.map(n => n.kind === "message" && n.entity_id === item.id && !n.read_at ? { ...n, read_at: readAt } : n));
       setUnreadMessageCount(current => Math.max(0, current - (messages ?? []).filter((message: LiveMessage) => message.sender_id !== userId && !(message as LiveMessage).read_at).length));
+      void loadInbox(userId);
       setSelectedCreator({ username: item.username, initial: (item.displayName[0] || "Z").toUpperCase(), avatarUrl: item.avatarUrl });
       activeConversationRef.current = item.id;
       setActiveConversationId(item.id);
