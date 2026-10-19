@@ -1038,3 +1038,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 /* Expandable community post captions */
 .post-caption-toggle{display:inline-flex;align-items:center;margin-top:3px;padding:0;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .post-caption-toggle:hover{color:var(--text)}
+
+
+/* X-style post view count in the community feed */
+.post-view-count{display:inline-flex;align-items:center;gap:5px;margin-left:auto;padding:7px 9px;color:var(--muted,#8d9b94);font-size:12px;font-weight:650;white-space:nowrap}
+.post-view-count svg{flex:0 0 auto;opacity:.85}
