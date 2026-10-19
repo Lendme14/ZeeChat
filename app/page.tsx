@@ -456,9 +456,15 @@ export default function HomePage() {
         if (!active) return;
         const incoming = payload.new as ZeeNotification;
         if (!incoming?.id) return;
-        setNotifications(current => current.some(item => item.id === incoming.id)
-          ? current
-          : [incoming, ...current].slice(0, 50));
+        const isOpenConversation = incoming.kind === "message" && Boolean(incoming.entity_id) && activeConversationRef.current === incoming.entity_id;
+        const notification = isOpenConversation ? { ...incoming, read_at: new Date().toISOString() } : incoming;
+        setNotifications(current => current.some(item => item.id === notification.id)
+          ? current.map(item => item.id === notification.id ? { ...item, read_at: item.read_at ?? notification.read_at } : item)
+          : [notification, ...current].slice(0, 50));
+        if (isOpenConversation) {
+          void supabase.from("zeechat_notifications").update({ read_at: notification.read_at })
+            .eq("id", notification.id).eq("recipient_id", userId);
+        }
         void refreshUnreadMessages();
         void loadInbox(userId);
       })
@@ -476,7 +482,8 @@ export default function HomePage() {
             : [...current.filter(message => !(message.id.startsWith("optimistic-") && message.sender_id === incoming.sender_id && message.body === incoming.body)), incoming]
               .sort((a, b) => a.created_at.localeCompare(b.created_at)));
           void supabase.from("zeechat_messages").update({ read_at: new Date().toISOString() })
-            .eq("id", incoming.id).eq("conversation_id", incoming.conversation_id);
+            .eq("id", incoming.id).eq("conversation_id", incoming.conversation_id)
+            .then(() => refreshUnreadMessages());
         }
       })
       .subscribe();
