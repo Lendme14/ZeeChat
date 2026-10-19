@@ -143,7 +143,11 @@ export default function HomePage() {
     } catch { /* Count this view for the current session even if storage is unavailable. */ }
     setPostViewCounts(current => ({ ...current, [postId]: (current[postId] ?? 0) + 1 }));
     const client = createClient();
-    void client.from("zeechat_post_views").insert({ post_id: postId, viewer_id: userId });
+    void client.from("zeechat_post_views").insert({ post_id: postId, viewer_id: userId }).then(async ({ error }) => {
+      if (error) { console.error("Unable to record ZeeChat Reel view", error); return; }
+      const { count, error: countError } = await client.from("zeechat_post_views").select("id", { count: "exact", head: true }).eq("post_id", postId);
+      if (!countError && typeof count === "number") setPostViewCounts(current => ({ ...current, [postId]: count }));
+    });
   }, [selectedLiveReel?.id, userId]);
 
   const reel = selectedLiveReel ? { user: postAuthors[selectedLiveReel.author_id]?.username || "zeechatter", caption: selectedLiveReel.caption, tags: "", sound: "original audio", image: "", likes: "0", comments: "0", initial: (postAuthors[selectedLiveReel.author_id]?.display_name || "Z").slice(0, 1).toUpperCase(), mediaUrl: selectedLiveReel.media_url || "", postId: selectedLiveReel.id } : { ...sampleReels[index], mediaUrl: "", postId: "" };
