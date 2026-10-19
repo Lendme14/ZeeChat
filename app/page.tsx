@@ -541,7 +541,7 @@ export default function HomePage() {
       const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", otherIds);
       if (profileError) throw profileError;
       if (!isLatestRequest()) return;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });
       if (messageError) throw messageError;
       if (!isLatestRequest()) return;
       const latest: Record<string, LiveMessage> = {}; for (const message of (messages ?? []) as LiveMessage[]) if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
@@ -562,7 +562,7 @@ export default function HomePage() {
     try {
       const supabase = createClient();
       const { data: messages, error } = await supabase.from("zeechat_messages")
-        .select("id,conversation_id,sender_id,body,created_at")
+        .select("id,conversation_id,sender_id,body,created_at,read_at")
         .eq("conversation_id", item.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -598,7 +598,7 @@ export default function HomePage() {
       const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });
       if (error) throw error;
       const id=conversationId as string;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").eq("conversation_id",id).order("created_at",{ascending:true});
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at").eq("conversation_id",id).order("created_at",{ascending:true});
       if (messageError) throw messageError;
       const { data: targetProfile } = await supabase.from("zeechat_profiles").select("avatar_url").eq("user_id",targetUserId).maybeSingle();
       if (requestId !== chatOpenRequestRef.current) return;
@@ -617,7 +617,7 @@ export default function HomePage() {
     setChatDraft("");
     try {
       const supabase=createClient();
-      const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();
+      const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at,read_at").single();
       if(error) throw error;
       if (activeConversationRef.current === conversationId) {
         setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message));
