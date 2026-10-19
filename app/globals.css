@@ -1080,3 +1080,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
  .notification-item-copy b{font-size:12px}
  .notification-item-copy>span{font-size:11px}
 }
+
+
+@media(max-width:600px){
+  .mobile-nav button{position:relative}
+  .mobile-nav .unread-count-badge{position:absolute;top:2px;right:calc(50% - 25px);min-width:18px;height:18px;padding:0 4px;font-size:9px;box-shadow:0 0 0 2px #f4f7f5}
+}
