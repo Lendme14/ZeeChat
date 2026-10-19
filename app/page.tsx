@@ -1323,10 +1323,6 @@ export default function HomePage() {
     }
   }, [userId, profile]);
 
-  useEffect(() => {
-    if (view === "Play") void loadCaptionBattle();
-  }, [view, loadCaptionBattle]);
-
   const loadWeeklyCaptionLeaderboard = useCallback(async () => {
     if (!userId) {
       setWeeklyCaptionLeaders([]);
