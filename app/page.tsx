@@ -1171,6 +1171,54 @@ export default function HomePage() {
     } finally { setBusy(false); }
   }
 
+
+  function startTrivia() {
+    setTriviaQuestions(getDailyTriviaQuestions());
+    setTriviaIndex(0);
+    setTriviaAnswer(null);
+    setTriviaScore(0);
+    setTriviaFinished(false);
+    setTriviaStarted(true);
+  }
+
+  function chooseTriviaAnswer(optionIndex: number) {
+    const question = triviaQuestions[triviaIndex];
+    if (!question || triviaAnswer !== null) return;
+    setTriviaAnswer(optionIndex);
+    if (optionIndex === question.answer) setTriviaScore(score => score + 1);
+  }
+
+  function advanceTrivia() {
+    if (triviaIndex < triviaQuestions.length - 1) {
+      setTriviaIndex(index => index + 1);
+      setTriviaAnswer(null);
+      return;
+    }
+    const today = localDateKey();
+    const yesterday = localDateKey(new Date(Date.now() - 86400000));
+    const storageKey = \`zeechat-trivia-stats-\${userId ?? "guest"}\`;
+    const nextStats: TriviaStats = {
+      bestScore: Math.max(triviaStats.bestScore, triviaScore),
+      streak: triviaStats.lastPlayed === today ? triviaStats.streak : triviaStats.lastPlayed === yesterday ? triviaStats.streak + 1 : 1,
+      lastPlayed: today,
+    };
+    setTriviaStats(nextStats);
+    try { localStorage.setItem(storageKey, JSON.stringify(nextStats)); } catch { /* Keep the result visible if storage is unavailable. */ }
+    setTriviaStarted(false);
+    setTriviaFinished(true);
+  }
+
+  async function shareTriviaScore() {
+    const message = \`I scored \${triviaScore}/5 in today’s ZeeChat Quickfire Trivia! Can you beat me? \${window.location.origin}\`;
+    try {
+      if (navigator.share) await navigator.share({ title: "ZeeChat Quickfire Trivia", text: message });
+      else {
+        await navigator.clipboard.writeText(message);
+        setNotice("Score copied — send it to a friend!");
+      }
+    } catch { /* Share sheet dismissed or clipboard unavailable. */ }
+  }
+
   return <main className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="#"><span className="brand-mark">z</span><span>Zee<b>Chat</b></span></a>
@@ -1213,19 +1261,95 @@ export default function HomePage() {
         <div className="upcoming-party-list"><article><div className="upcoming-date"><b>08</b><span>PM</span></div><div className="upcoming-copy"><h3>Creators Unplugged</h3><p><CalendarClock size={13}/> Tonight · Host Q&amp;A and open mic</p></div><button onClick={() => setNotice("Reminders will be available when party scheduling is connected.")}>Remind me <span>＋</span></button></article><article><div className="upcoming-date"><b>09</b><span>PM</span></div><div className="upcoming-copy"><h3>Chill &amp; Chat 🌙</h3><p><CalendarClock size={13}/> Tomorrow · Meet new people</p></div><button onClick={() => setNotice("Reminders will be available when party scheduling is connected.")}>Remind me <span>＋</span></button></article></div>
         <div className="party-bottom-cta"><div><span className="eyebrow">YOUR ROOM. YOUR RULES.</span><h2>Host the next <em>great night.</em></h2><p>Create a space for your people to hang out.</p></div><button className="create-button" onClick={() => setPartyCreateOpen(true)}><Plus size={18}/> Create party</button></div>
       </section>}
-      {view === "Play" && <section className="content-view play-view">
-        <div className="play-heading"><span className="eyebrow">YOUR DAILY DOSE OF FUN</span><h1>Let&apos;s <em>play.</em></h1><p>Quick challenges, tiny wins, and something fun to share with your people.</p></div>
-        <div className="daily-challenge-banner"><div className="daily-challenge-icon">⚡</div><div><span className="eyebrow">TODAY&apos;S CHALLENGE</span><h2>Quickfire Trivia</h2><p>Five questions. One daily run. How many can you get right?</p></div><div className="daily-challenge-meta"><span>🧠 5 rounds</span><span>🏆 {triviaStats.bestScore}/5 best</span><span>🔥 {triviaStats.streak} day streak</span></div></div>
-        {!triviaStarted && !triviaFinished && <div className="trivia-start-panel"><div className="trivia-orbit">🧠</div><h2>Ready to flex your brain?</h2><p>Your daily set refreshes each day. Play for fun, beat your personal best, then share your score with friends.</p><div className="trivia-rules"><span><Check size={16}/> 5 multiple-choice questions</span><span><Check size={16}/> Instant answer explanations</span><span><Check size={16}/> Personal best and streak saved on this device</span></div><button className="trivia-primary-button" onClick={() => { setTriviaQuestions(getDailyTriviaQuestions()); setTriviaIndex(0); setTriviaAnswer(null); setTriviaScore(0); setTriviaFinished(false); setTriviaStarted(true); }}>Start today&apos;s challenge <ArrowLeft size={17} className="trivia-start-arrow"/></button></div>}
-        {triviaStarted && !triviaFinished && triviaQuestions[triviaIndex] && <div className="trivia-game-panel">
-          <div className="trivia-progress-row"><span>QUESTION {triviaIndex + 1} OF {triviaQuestions.length}</span><span>✨ {triviaScore} {triviaScore === 1 ? "point" : "points"}</span></div><div className="trivia-progress-track"><span style={{width:`${((triviaIndex + (triviaAnswer !== null ? 1 : 0)) / triviaQuestions.length) * 100}%`}}/></div>
-          <h2>{triviaQuestions[triviaIndex].question}</h2>
-          <div className="trivia-options">{triviaQuestions[triviaIndex].options.map((option, optionIndex) => <button key={option} className={triviaAnswer === null ? "trivia-option" : optionIndex === triviaQuestions[triviaIndex].answer ? "trivia-option is-correct" : triviaAnswer === optionIndex ? "trivia-option is-wrong" : "trivia-option is-muted"} disabled={triviaAnswer !== null} onClick={() => { const correct = optionIndex === triviaQuestions[triviaIndex].answer; const nextScore = triviaScore + (correct ? 1 : 0); setTriviaAnswer(optionIndex); setTriviaScore(nextScore); }}>{option}<span>{triviaAnswer !== null && optionIndex === triviaQuestions[triviaIndex].answer ? "✓" : triviaAnswer === optionIndex ? "×" : String.fromCharCode(65 + optionIndex)}</span></button>)}</div>
-          {triviaAnswer !== null && <div className={triviaAnswer === triviaQuestions[triviaIndex].answer ? "trivia-feedback correct-feedback" : "trivia-feedback"}><b>{triviaAnswer === triviaQuestions[triviaIndex].answer ? "That&apos;s right!" : "Not quite!"}</b><p>{triviaQuestions[triviaIndex].fact}</p><button className="trivia-primary-button" onClick={() => { if (triviaIndex < triviaQuestions.length - 1) { setTriviaIndex(triviaIndex + 1); setTriviaAnswer(null); return; } const today = localDateKey(); const yesterday = localDateKey(new Date(Date.now() - 86400000)); const storageKey = `zeechat-trivia-stats-${userId ?? "guest"}`; const previous = triviaStats; const nextStats: TriviaStats = { bestScore: Math.max(previous.bestScore, triviaScore), streak: previous.lastPlayed === today ? previous.streak : previous.lastPlayed === yesterday ? previous.streak + 1 : 1, lastPlayed: today }; setTriviaStats(nextStats); try { localStorage.setItem(storageKey, JSON.stringify(nextStats)); } catch { /* Keep the result visible if storage is unavailable. */ } setTriviaStarted(false); setTriviaFinished(true); }}>{triviaIndex < triviaQuestions.length - 1 ? "Next question" : "See my result"} <span>→</span></button></div>}
-        </div>}
-        {triviaFinished && <div className="trivia-result-panel"><div className="trivia-result-emoji">{triviaScore === 5 ? "🏆" : triviaScore >= 3 ? "🎉" : "💪"}</div><span className="eyebrow">DAILY CHALLENGE COMPLETE</span><h2>{triviaScore === 5 ? "Perfect run!" : triviaScore >= 3 ? "You showed up!" : "Every round makes you sharper."}</h2><div className="trivia-score"><strong>{triviaScore}</strong><span>/ 5 correct</span></div><p>{triviaScore === 5 ? "Five out of five. Go on and let your friends know." : "Your next run is another chance to beat your best."}</p><div className="trivia-result-stats"><span><small>PERSONAL BEST</small><b>{triviaStats.bestScore}/5</b></span><span><small>DAY STREAK</small><b>🔥 {triviaStats.streak}</b></span></div><div className="trivia-result-actions"><button className="trivia-primary-button" onClick={async () => { const message = `I scored ${triviaScore}/5 in today’s ZeeChat Quickfire Trivia! Can you beat me? ${window.location.origin}`; try { if (navigator.share) await navigator.share({ title: "ZeeChat Quickfire Trivia", text: message }); else { await navigator.clipboard.writeText(message); setNotice("Score copied — send it to a friend!"); } } catch { /* Share sheet dismissed or clipboard unavailable. */ }}>Share my score <Users size={17}/></button><button className="trivia-secondary-button" onClick={() => { setTriviaFinished(false); setTriviaStarted(false); setTriviaAnswer(null); }}>Back to Play</button></div></div>}
-        <div className="feature-grid play-coming-soon"><article className="feature-card"><div className="feature-emoji">😂</div><h3>Caption This</h3><p>Turn a photo into the funniest line in the room.</p><button onClick={() => setNotice("Caption battles are next on the ZeeChat Play roadmap.")}>Coming next ↗</button></article><article className="feature-card"><div className="feature-emoji">🎤</div><h3>Voice Room Roulette</h3><p>Meet people through shared interests and conversation.</p><button onClick={() => setNotice("Voice Room Roulette is planned for a future release.")}>Coming next ↗</button></article></div>
-      </section>}
+      {view === "Play" && (
+        <section className="content-view play-view">
+          <div className="play-heading">
+            <span className="eyebrow">YOUR DAILY DOSE OF FUN</span>
+            <h1>Let&apos;s <em>play.</em></h1>
+            <p>Quick challenges, tiny wins, and something fun to share with your people.</p>
+          </div>
+          <div className="daily-challenge-banner">
+            <div className="daily-challenge-icon">⚡</div>
+            <div className="daily-challenge-copy">
+              <span className="eyebrow">TODAY&apos;S CHALLENGE</span>
+              <h2>Quickfire Trivia</h2>
+              <p>Five questions. One daily run. How many can you get right?</p>
+            </div>
+            <div className="daily-challenge-meta">
+              <span>🧠 5 rounds</span>
+              <span>🏆 {triviaStats.bestScore}/5 best</span>
+              <span>🔥 {triviaStats.streak} day streak</span>
+            </div>
+          </div>
+          {!triviaStarted && !triviaFinished && (
+            <div className="trivia-start-panel">
+              <div className="trivia-orbit">🧠</div>
+              <h2>Ready to flex your brain?</h2>
+              <p>Your daily set refreshes each day. Play for fun, beat your personal best, then share your score with friends.</p>
+              <div className="trivia-rules">
+                <span><Check size={16}/> 5 multiple-choice questions</span>
+                <span><Check size={16}/> Instant answer explanations</span>
+                <span><Check size={16}/> Personal best and streak saved on this device</span>
+              </div>
+              <button className="trivia-primary-button" onClick={startTrivia}>Start today&apos;s challenge <ArrowLeft size={17} className="trivia-start-arrow"/></button>
+            </div>
+          )}
+          {triviaStarted && !triviaFinished && triviaQuestions[triviaIndex] && (
+            <div className="trivia-game-panel">
+              <div className="trivia-progress-row">
+                <span>QUESTION {triviaIndex + 1} OF {triviaQuestions.length}</span>
+                <span>✨ {triviaScore} {triviaScore === 1 ? "point" : "points"}</span>
+              </div>
+              <div className="trivia-progress-track"><span style={{ width: \`\${((triviaIndex + (triviaAnswer !== null ? 1 : 0)) / triviaQuestions.length) * 100}%\` }}/></div>
+              <h2>{triviaQuestions[triviaIndex].question}</h2>
+              <div className="trivia-options">
+                {triviaQuestions[triviaIndex].options.map((option, optionIndex) => {
+                  let optionClass = "trivia-option";
+                  if (triviaAnswer !== null && optionIndex === triviaQuestions[triviaIndex].answer) optionClass += " is-correct";
+                  else if (triviaAnswer === optionIndex) optionClass += " is-wrong";
+                  else if (triviaAnswer !== null) optionClass += " is-muted";
+                  return (
+                    <button key={option} className={optionClass} disabled={triviaAnswer !== null} onClick={() => chooseTriviaAnswer(optionIndex)}>
+                      {option}
+                      <span>{triviaAnswer !== null && optionIndex === triviaQuestions[triviaIndex].answer ? "✓" : triviaAnswer === optionIndex ? "×" : String.fromCharCode(65 + optionIndex)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {triviaAnswer !== null && (
+                <div className={triviaAnswer === triviaQuestions[triviaIndex].answer ? "trivia-feedback correct-feedback" : "trivia-feedback"}>
+                  <b>{triviaAnswer === triviaQuestions[triviaIndex].answer ? "Correct!" : "Not quite!"}</b>
+                  <p>{triviaQuestions[triviaIndex].fact}</p>
+                  <button className="trivia-primary-button" onClick={advanceTrivia}>
+                    {triviaIndex < triviaQuestions.length - 1 ? "Next question" : "See my result"} <span>→</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {triviaFinished && (
+            <div className="trivia-result-panel">
+              <div className="trivia-result-emoji">{triviaScore === 5 ? "🏆" : triviaScore >= 3 ? "🎉" : "💪"}</div>
+              <span className="eyebrow">DAILY CHALLENGE COMPLETE</span>
+              <h2>{triviaScore === 5 ? "Perfect run!" : triviaScore >= 3 ? "You showed up!" : "Every round makes you sharper."}</h2>
+              <div className="trivia-score"><strong>{triviaScore}</strong><span>/ 5 correct</span></div>
+              <p>{triviaScore === 5 ? "Five out of five. Go on and let your friends know." : "Your next run is another chance to beat your best."}</p>
+              <div className="trivia-result-stats">
+                <span><small>PERSONAL BEST</small><b>{triviaStats.bestScore}/5</b></span>
+                <span><small>DAY STREAK</small><b>🔥 {triviaStats.streak}</b></span>
+              </div>
+              <div className="trivia-result-actions">
+                <button className="trivia-primary-button" onClick={shareTriviaScore}>Share my score <Users size={17}/></button>
+                <button className="trivia-secondary-button" onClick={() => { setTriviaFinished(false); setTriviaStarted(false); setTriviaAnswer(null); }}>Back to Play</button>
+              </div>
+            </div>
+          )}
+          <div className="feature-grid play-coming-soon">
+            <article className="feature-card"><div className="feature-emoji">😂</div><h3>Caption This</h3><p>Turn a photo into the funniest line in the room.</p><button onClick={() => setNotice("Caption battles are next on the ZeeChat Play roadmap.")}>Coming next ↗</button></article>
+            <article className="feature-card"><div className="feature-emoji">🎤</div><h3>Voice Room Roulette</h3><p>Meet people through shared interests and conversation.</p><button onClick={() => setNotice("Voice Room Roulette is planned for a future release.")}>Coming next ↗</button></article>
+          </div>
+        </section>
+      )}
       {view === "Chats" && <section className={activeChat ? "content-view chat-view chat-detail-view" : "content-view chat-view"}>{activeChat ? <><header className="chat-detail-header"><button className="chat-back-button" onClick={() => {setActiveChat(false);setActiveConversationId(null);activeConversationRef.current=null;void loadInbox(userId ?? "");}} aria-label="Back to messages"><ArrowLeft size={20}/></button><button className="chat-contact" onClick={() => { if (selectedCreator?.username) setView("Profile"); else setNotice("This conversation has no linked creator profile."); }}><span className="chat-contact-avatar">{selectedCreator?.avatarUrl && !failedAvatarUrls.includes(selectedCreator.avatarUrl) ? <Image src={selectedCreator.avatarUrl} alt={`${selectedCreator.username} profile photo`} width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(selectedCreator.avatarUrl!) ? current : [...current, selectedCreator.avatarUrl!])}/> : (selectedCreator?.initial ?? "Z")}<i/></span><span><b>{selectedCreator?.username ?? "Conversation"}</b><small><i/> Direct message</small></span></button><button className="chat-more-button" onClick={() => setNotice("Conversation options: View profile, Search chat, Mute, Block and Report will be added with live messaging.")} aria-label="Conversation options"><MoreHorizontal size={22}/></button></header><div className="chat-timeline" aria-label="Conversation messages"><div className="chat-date-divider"><span>Today</span></div>{liveMessages.map(message=><div className={"chat-message-row "+(message.sender_id===userId ? "mine" : "theirs")} key={message.id}><div className="chat-message-content"><div className="chat-bubble">{message.body}</div><div className="chat-message-meta"><time>{new Date(message.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>{message.sender_id===userId && <Check size={13}/>}</div></div></div>)}{!liveMessages.length && <p className="chat-first-message">You’re connected. Send the first message.</p>}</div><form className="chat-composer" onSubmit={event => {event.preventDefault(); void sendLiveMessage();}}><button type="button" className="chat-attach-button" aria-label="Attachment options" onClick={() => setNotice("Photo, video and file attachments will be available when chat storage is connected.")}><Paperclip size={20}/></button><textarea rows={1} aria-label="Write a message" placeholder="Message ZeeChat…" value={chatDraft} maxLength={4000} onChange={event=>setChatDraft(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit();}}}/><button type="button" className="chat-emoji-button" aria-label="Emoji" onClick={()=>setChatDraft(draft=>draft+"😊")}><Smile size={19}/></button><button type="submit" className="chat-send-button" disabled={!chatDraft.trim()} aria-label="Send message"><Send size={18}/></button></form></> : <><div className="chat-heading"><div><span className="eyebrow">YOUR PEOPLE, YOUR SPACE</span><h1>Messages</h1><p>Keep good conversations going.</p></div><button className="chat-compose" onClick={() => setNotice("New conversations will be available when messaging is connected.")} aria-label="New message"><Plus size={20}/></button></div><div className="chat-search"><Search size={17}/><input aria-label="Search conversations" placeholder="Search conversations…" value={inboxSearch} onChange={event => setInboxSearch(event.target.value)}/>{inboxSearch && <button type="button" aria-label="Clear conversation search" onClick={() => setInboxSearch("")}>×</button>}</div><div className="chat-filter-row"><button type="button" className={inboxFilter === "all" ? "chat-filter-active" : ""} onClick={() => setInboxFilter("all")}>All messages</button><button type="button" className={inboxFilter === "unread" ? "chat-filter-active" : ""} onClick={() => setInboxFilter("unread")}>Unread{unreadConversationCount > 0 ? ` (${unreadConversationCount})` : ""}</button><button type="button" onClick={() => setNotice("Message requests are not available yet.")}>Requests</button></div>{filteredInboxConversations.length ? (<div className="chat-live-inbox">{filteredInboxConversations.map(item=><button type="button" className="chat-demo-thread" key={item.id} onClick={()=>void openExistingConversation(item)} disabled={chatLoading}><span className="chat-contact-avatar">{item.avatarUrl && !failedAvatarUrls.includes(item.avatarUrl) ? <Image src={item.avatarUrl} alt="" width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(item.avatarUrl!) ? current : [...current, item.avatarUrl!])}/> : (item.displayName[0]||"Z").toUpperCase()}<i/></span><span className="chat-demo-thread-copy"><b>{item.displayName}<small>{item.lastAt ? new Date(item.lastAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</small>{item.unreadCount > 0 && <i className="chat-demo-unread" aria-label={`${item.unreadCount} unread messages`}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</i>}</b><span>{item.lastMessage}</span></span></button>)}</div>) : (inboxConversations.length && (inboxSearch.trim() || inboxFilter === "unread") ? (<div className="chat-inbox-empty"><div className="chat-empty-art"><Search size={25}/></div><h2>{inboxFilter === "unread" && !inboxSearch.trim() ? "You’re all caught up" : inboxFilter === "unread" ? "No matching unread chats" : "No matching conversations"}</h2><p>{inboxFilter === "unread" && !inboxSearch.trim() ? "There are no unread conversations right now." : "Try another name, username, or message keyword."}</p><button onClick={() => {setInboxSearch("");setInboxFilter("all");}}>Show all messages <span>→</span></button></div>) : (<div className="chat-inbox-empty"><div className="chat-empty-art"><MessageCircle size={29}/></div><h2>No conversations yet</h2><p>Visit a creator’s profile and tap Message to start a real conversation.</p><button onClick={() => setView("Discover")}>Discover people <span>→</span></button></div>))}</>}</section>}
       {view === "Profile" && selectedCreator ? <section className="content-view profile-view creator-preview-view">
         <button className="creator-preview-back" onClick={() => {setSelectedCreator(null);setView("Reels");}}><ArrowLeft size={17}/> Back to Reels</button>
