@@ -320,7 +320,7 @@ export default function HomePage() {
           if (active && views) {
             const counts: Record<string, number> = {};
             for (const view of views) counts[view.post_id] = (counts[view.post_id] ?? 0) + 1;
-            setPostViewCounts(current => ({ ...counts, ...current }));
+            setPostViewCounts(current => ({ ...current, ...counts }));
           }
           const authorIds = [...new Set(loadedPosts.map(post => post.author_id))];
           const { data: authorProfiles } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", authorIds);
