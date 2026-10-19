@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,8 +8,17 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "ZeeChat" },
   formatDetection: { telephone: false },
   manifest: "/manifest.json",
+  icons: { icon: "/icons/zeechat.svg" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0c0b10",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}<script dangerouslySetInnerHTML={{__html: `if (\"serviceWorker\" in navigator) { window.addEventListener(\"load\", () => navigator.serviceWorker.register(\"/sw.js\").catch(() => {})); }`}} /></body></html>;
+  return <html lang="en"><body>{children}<script dangerouslySetInnerHTML={{__html: `if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {})); }`}} /></body></html>;
 }
