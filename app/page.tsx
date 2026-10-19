@@ -1537,7 +1537,7 @@ export default function HomePage() {
                       const voted = captionBattleVotedIds.includes(entry.id);
                       const voteBusy = captionBattleBusyIds.includes(entry.id);
                       return <article className="caption-battle-entry" key={entry.id}>
-                        <div className="caption-battle-rank>{captionBattleSort === "top" && entry.vote_count > 0 ? (rank === 0 ? "🏆" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "#" + (rank + 1)) : "💬"}</div>
+                        <div className="caption-battle-rank">{captionBattleSort === "top" && entry.vote_count > 0 ? (rank === 0 ? "🏆" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "#" + (rank + 1)) : "💬"}</div>
                         <div className="caption-battle-entry-copy"><p>{entry.caption}</p><div><b>{ownEntry ? "You" : entry.displayName}</b><span>@{entry.username}</span></div></div>
                         <button type="button" className={voted ? "caption-battle-vote voted" : "caption-battle-vote"} disabled={ownEntry || voted || voteBusy} onClick={() => void voteForCaptionBattleEntry(entry)} aria-label={ownEntry ? "Your caption" : voted ? "You voted for this caption" : "Vote for this caption"}><Heart size={15} fill={voted ? "currentColor" : "none"}/><span>{entry.vote_count}</span><small>{ownEntry ? "Yours" : voted ? "Voted" : voteBusy ? "Saving…" : "Vote"}</small></button>
                       </article>;
