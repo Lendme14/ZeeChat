@@ -1151,3 +1151,30 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .caption-battle-footnote{display:flex;align-items:center;gap:7px;margin-top:17px;color:#93889b;font-size:10px;line-height:1.5}
 .caption-battle-footnote svg{flex:0 0 auto;color:var(--mint)}
 @media(max-width:560px){.caption-battle-panel{padding:16px;border-radius:19px}.caption-battle-header{gap:10px}.caption-battle-header h2{font-size:23px}.caption-battle-header p{font-size:12px}.caption-battle-today{min-width:64px;padding:9px}.caption-battle-today span{font-size:20px}.caption-battle-today small{font-size:8px}.caption-battle-form{padding:12px}.caption-battle-form-footer{align-items:flex-start;flex-direction:column}.caption-battle-form-footer button{width:100%}.caption-battle-entry{gap:8px;padding:10px}.caption-battle-rank{flex-basis:29px;height:29px;border-radius:9px;font-size:10px}.caption-battle-entry-copy>p{font-size:12px}.caption-battle-vote{flex-basis:54px;min-height:54px}.caption-battle-footnote{align-items:flex-start}}
+
+
+/* Weekly Caption Battle leaderboard */
+.weekly-caption-leaderboard{margin:24px 0 30px;padding:clamp(18px,3vw,26px);border:1px solid #3e344b;border-radius:22px;background:radial-gradient(circle at 100% 0,#342344 0,transparent 45%),linear-gradient(145deg,#191620,#121117)}
+.weekly-caption-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.weekly-caption-heading h2{margin:7px 0;font-size:clamp(22px,3vw,29px);letter-spacing:-.7px}
+.weekly-caption-heading h2 span{font-size:20px}
+.weekly-caption-heading p{margin:0;max-width:520px;color:#c8bdcf;font-size:12px;line-height:1.6}
+.weekly-caption-period{flex:0 0 auto;padding:8px 10px;border:1px solid #493853;border-radius:10px;background:#211a2a;color:#d8c8e1;font-size:9px;font-weight:850;letter-spacing:.6px}
+.weekly-caption-list{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px}
+.weekly-caption-row{display:flex;align-items:center;gap:11px;min-width:0;padding:11px 12px;border:1px solid #302936;border-radius:14px;background:#17141d}
+.weekly-caption-rank{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:9px;background:#28202f;color:#d9cbe2;font-size:12px;font-weight:850}
+.weekly-caption-podium{background:#35283c}
+.weekly-caption-avatar{display:grid;place-items:center;overflow:hidden;flex:0 0 36px;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ff6ba6,#a88bff);color:white;font-size:13px;font-weight:850}
+.weekly-caption-avatar img{width:100%;height:100%;object-fit:cover}
+.weekly-caption-creator{display:grid;gap:3px;flex:1;min-width:0}
+.weekly-caption-creator b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.weekly-caption-creator small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px}
+.weekly-caption-votes{display:grid;justify-items:end;gap:2px;flex:0 0 auto}
+.weekly-caption-votes b{font-size:16px;color:#ff9ac2}
+.weekly-caption-votes small{color:var(--muted);font-size:9px}
+.weekly-caption-empty{padding:22px 14px;margin-top:14px;border:1px dashed #403447;border-radius:14px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+.weekly-caption-empty b{color:#eee4f3;font-size:13px}
+.weekly-caption-empty p{margin:5px 0 0}
+.weekly-caption-refresh{margin-top:13px;padding:8px 11px;border:1px solid #413448;border-radius:10px;background:#211a29;color:#e4d6eb;font-size:10px;font-weight:750}
+.weekly-caption-refresh:disabled{opacity:.5}
+@media(max-width:560px){.weekly-caption-leaderboard{padding:15px;border-radius:18px}.weekly-caption-heading{gap:8px}.weekly-caption-heading h2{font-size:21px}.weekly-caption-heading p{font-size:11px}.weekly-caption-period{font-size:8px;padding:7px}.weekly-caption-row{gap:8px;padding:9px}.weekly-caption-avatar{flex-basis:32px;width:32px;height:32px}.weekly-caption-creator b{font-size:11px}}

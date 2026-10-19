@@ -14,7 +14,7 @@ type PostAuthor = { username: string; display_name: string; avatar_url?: string 
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; };
 type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null };
-type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
+type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like" | "caption_vote"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
 type InboxConversation = { id: string; otherUserId: string; username: string; displayName: string; avatarUrl: string | null; lastMessage: string; lastAt: string | null; unreadCount: number };
 const sampleReels = [
   { user: "mira.moves", caption: "POV: the group chat finally makes it outside 😂✨", tags: "#goodvibes #weekendenergy", sound: "original audio · Mira", image: "photo-1533174072545-7a4b6ad7a6c3", likes: "24.8K", comments: "1,204", initial: "M" },
@@ -54,6 +54,7 @@ function ContentActionMenu({ label, onDelete, disabled = false }: { label: strin
 
 
 type CaptionBattleEntry = { id: string; author_id: string; challenge_date: string; caption: string; vote_count: number; created_at: string; displayName: string; username: string; avatarUrl?: string | null };
+type WeeklyCaptionLeader = { authorId: string; displayName: string; username: string; avatarUrl?: string | null; votes: number; entries: number };
 const DAILY_CAPTION_PROMPTS = [
   "Your friend said “I’m five minutes away” 45 minutes ago. Caption this.",
   "When payday lands and every bill was waiting in line. What’s the caption?",
@@ -138,6 +139,8 @@ export default function HomePage() {
   const [captionBattleSort, setCaptionBattleSort] = useState<"top" | "new">("top");
   const [captionBattleVotedIds, setCaptionBattleVotedIds] = useState<string[]>([]);
   const [captionBattleBusyIds, setCaptionBattleBusyIds] = useState<string[]>([]);
+  const [weeklyCaptionLeaders, setWeeklyCaptionLeaders] = useState<WeeklyCaptionLeader[]>([]);
+  const [weeklyCaptionLoading, setWeeklyCaptionLoading] = useState(false);
 
 
   const [index, setIndex] = useState(0);
@@ -642,7 +645,9 @@ export default function HomePage() {
       if (!error) setNotifications(current => current.map(row => row.id === item.id ? { ...row, read_at: now } : row));
     }
     setNotificationsOpen(false);
-    if (item.kind === "message") {
+    if (item.kind === "caption_vote") {
+      setView("Play");
+    } else if (item.kind === "message") {
       setActiveChat(false);
       setActiveConversationId(null);
       activeConversationRef.current = null;
@@ -1318,9 +1323,71 @@ export default function HomePage() {
     }
   }, [userId, profile]);
 
+  const loadWeeklyCaptionLeaderboard = useCallback(async () => {
+    if (!userId) {
+      setWeeklyCaptionLeaders([]);
+      setWeeklyCaptionLoading(false);
+      return;
+    }
+    setWeeklyCaptionLoading(true);
+    try {
+      const supabase = createClient();
+      const now = new Date();
+      const utcDay = now.getUTCDay();
+      now.setUTCDate(now.getUTCDate() - (utcDay === 0 ? 6 : utcDay - 1));
+      const weekStart = now.toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase.from("zeechat_caption_battles")
+        .select("id,author_id,vote_count,challenge_date")
+        .gte("challenge_date", weekStart)
+        .lte("challenge_date", today)
+        .order("vote_count", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      const totals = new Map<string, { votes: number; entries: number }>();
+      for (const entry of data ?? []) {
+        const current = totals.get(entry.author_id) ?? { votes: 0, entries: 0 };
+        current.votes += entry.vote_count ?? 0;
+        current.entries += 1;
+        totals.set(entry.author_id, current);
+      }
+      const authorIds = [...totals.keys()];
+      if (!authorIds.length) {
+        setWeeklyCaptionLeaders([]);
+        return;
+      }
+      const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles")
+        .select("user_id,username,display_name,avatar_url")
+        .in("user_id", authorIds);
+      if (profileError) throw profileError;
+      const profileMap = new Map((profiles ?? []).map(author => [author.user_id, author]));
+      const leaders = authorIds.map(authorId => {
+        const author = profileMap.get(authorId);
+        const total = totals.get(authorId)!;
+        return {
+          authorId,
+          displayName: author?.display_name || (authorId === userId ? profile?.display_name || "You" : "ZeeChat member"),
+          username: author?.username || (authorId === userId ? profile?.username || "you" : "member"),
+          avatarUrl: author?.avatar_url || null,
+          votes: total.votes,
+          entries: total.entries,
+        };
+      }).sort((a, b) => b.votes - a.votes || b.entries - a.entries || a.username.localeCompare(b.username)).slice(0, 10);
+      setWeeklyCaptionLeaders(leaders);
+    } catch (error) {
+      setWeeklyCaptionLeaders([]);
+      setNotice(error instanceof Error ? "Weekly leaderboard couldn’t load: " + error.message : "Weekly leaderboard couldn’t load. Please try again.");
+    } finally {
+      setWeeklyCaptionLoading(false);
+    }
+  }, [userId, profile]);
+
   useEffect(() => {
-    if (view === "Play") void loadCaptionBattle();
-  }, [view, loadCaptionBattle]);
+    if (view === "Play") {
+      void loadCaptionBattle();
+      void loadWeeklyCaptionLeaderboard();
+    }
+  }, [view, loadCaptionBattle, loadWeeklyCaptionLeaderboard]);
 
   async function submitCaptionBattleEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1396,7 +1463,7 @@ export default function HomePage() {
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {notificationsOpen && <section className="notification-center" aria-label="Notifications" aria-live="polite">
         <header className="notification-center-header"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>Notifications</h2><p>{notifications.filter(item => !item.read_at).length ? `${notifications.filter(item => !item.read_at).length} unread` : "You’re all caught up"}</p></div><div className="notification-center-actions">{notifications.some(item => !item.read_at) && <button type="button" onClick={() => void markAllNotificationsRead()}>Mark all read</button>}<button type="button" className="notification-close" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}>×</button></div></header>
-        {!userId ? <p className="notification-empty">Sign in to see your notifications.</p> : notifications.length ? <div className="notification-list">{notifications.map(item => <button type="button" key={item.id} className={`notification-item ${item.read_at ? "" : "is-unread"}`} onClick={() => void openNotification(item)}><span className={`notification-kind-icon notification-kind-${item.kind}`}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">No notifications yet. New messages, follows, comments and likes will show up here.</p>}
+        {!userId ? <p className="notification-empty">Sign in to see your notifications.</p> : notifications.length ? <div className="notification-list">{notifications.map(item => <button type="button" key={item.id} className={`notification-item ${item.read_at ? "" : "is-unread"}`} onClick={() => void openNotification(item)}><span className={`notification-kind-icon notification-kind-${item.kind}`}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : item.kind === "caption_vote" ? <Sparkles size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">No notifications yet. New messages, follows, comments, likes and Caption Battle votes will show up here.</p>}
       </section>}
       {uploadProgress !== null && <div className="upload-progress-card" role="status" aria-live="polite">
         <div className="upload-progress-ring" style={{background: `conic-gradient(#45d6a0 ${uploadProgress * 3.6}deg, #263a33 0deg)`}} aria-label={`Upload ${uploadProgress}% complete`}><span>{uploadProgress}%</span></div>
@@ -1509,6 +1576,21 @@ export default function HomePage() {
               </div>
             </div>
           )}
+          <section className="weekly-caption-leaderboard" aria-labelledby="weekly-caption-title">
+            <div className="weekly-caption-heading">
+              <div><span className="eyebrow">WEEKLY RANKINGS</span><h2 id="weekly-caption-title">Caption Champions <span>🏆</span></h2><p>Creators ranked by real votes earned in this week’s Caption Battles.</p></div>
+              <span className="weekly-caption-period">MON–SUN · UTC</span>
+            </div>
+            {!userId ? <div className="weekly-caption-empty">Sign in to see this week’s community leaderboard.</div> : weeklyCaptionLoading ? <div className="weekly-caption-empty">Counting this week’s votes…</div> : weeklyCaptionLeaders.length ? <ol className="weekly-caption-list">
+              {weeklyCaptionLeaders.map((leader, rank) => <li key={leader.authorId} className="weekly-caption-row">
+                <span className={"weekly-caption-rank" + (rank < 3 ? " weekly-caption-podium" : "")}>{rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : rank + 1}</span>
+                <span className="weekly-caption-avatar">{leader.avatarUrl ? <img src={leader.avatarUrl} alt="" loading="lazy" /> : (leader.displayName[0] || "Z").toUpperCase()}</span>
+                <span className="weekly-caption-creator"><b>{leader.authorId === userId ? "You" : leader.displayName}</b><small>@{leader.username} · {leader.entries} {leader.entries === 1 ? "entry" : "entries"}</small></span>
+                <span className="weekly-caption-votes"><b>{leader.votes}</b><small>{leader.votes === 1 ? "vote" : "votes"}</small></span>
+              </li>)}
+            </ol> : <div className="weekly-caption-empty"><b>The leaderboard is wide open.</b><p>Enter today’s Caption Battle and start earning votes to claim the top spot.</p></div>}
+            <button type="button" className="weekly-caption-refresh" onClick={() => void loadWeeklyCaptionLeaderboard()} disabled={weeklyCaptionLoading}>Refresh rankings ↻</button>
+          </section>
           <section className="caption-battle-panel" aria-labelledby="caption-battle-title">
             <div className="caption-battle-header">
               <div>
