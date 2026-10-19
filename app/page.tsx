@@ -53,6 +53,25 @@ function ContentActionMenu({ label, onDelete, disabled = false }: { label: strin
 }
 
 
+type CaptionBattleEntry = { id: string; author_id: string; challenge_date: string; caption: string; vote_count: number; created_at: string; displayName: string; username: string; avatarUrl?: string | null };
+const DAILY_CAPTION_PROMPTS = [
+  "Your friend said “I’m five minutes away” 45 minutes ago. Caption this.",
+  "When payday lands and every bill was waiting in line. What’s the caption?",
+  "POV: you opened the fridge for the fourth time hoping new food appeared.",
+  "When someone says “we need to talk” and then disappears for three hours.",
+  "That one friend who says “I’m not hungry” then eats half your food.",
+  "You said “one more episode” and suddenly the birds are singing.",
+  "When the group chat says “quick meeting” and sends a 47-minute voice note.",
+  "The face you make when mobile data finishes at the worst possible moment.",
+  "When you dress up just to find out the event was postponed.",
+  "You finally sit down to rest and everyone suddenly needs something.",
+  "When you hear “there’s food at home” but you were already outside.",
+  "That moment your phone falls on your face at 2 a.m."
+];
+function getDailyCaptionPrompt() {
+  const seed = Number(new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+  return DAILY_CAPTION_PROMPTS[seed % DAILY_CAPTION_PROMPTS.length];
+}
 type TriviaQuestion = { question: string; options: string[]; answer: number; fact: string };
 const TRIVIA_QUESTIONS: TriviaQuestion[] = [
   { question: "Which planet is known as the Red Planet?", options: ["Mars", "Venus", "Jupiter", "Mercury"], answer: 0, fact: "Iron minerals on Mars give its surface that rusty red look." },
@@ -112,6 +131,14 @@ export default function HomePage() {
   const [triviaStarted, setTriviaStarted] = useState(false);
   const [triviaFinished, setTriviaFinished] = useState(false);
   const [triviaStats, setTriviaStats] = useState<TriviaStats>({ bestScore: 0, streak: 0, lastPlayed: "" });
+  const [captionBattleEntries, setCaptionBattleEntries] = useState<CaptionBattleEntry[]>([]);
+  const [captionBattleDraft, setCaptionBattleDraft] = useState("");
+  const [captionBattleLoading, setCaptionBattleLoading] = useState(false);
+  const [captionBattleSubmitting, setCaptionBattleSubmitting] = useState(false);
+  const [captionBattleSort, setCaptionBattleSort] = useState<"top" | "new">("top");
+  const [captionBattleVotedIds, setCaptionBattleVotedIds] = useState<string[]>([]);
+  const [captionBattleBusyIds, setCaptionBattleBusyIds] = useState<string[]>([]);
+
 
   const [index, setIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
@@ -240,6 +267,9 @@ export default function HomePage() {
       } else setTriviaStats({ bestScore: 0, streak: 0, lastPlayed: "" });
     } catch { setTriviaStats({ bestScore: 0, streak: 0, lastPlayed: "" }); }
   }, [userId]);
+
+  const captionBattleHasEntered = Boolean(userId && captionBattleEntries.some(entry => entry.author_id === userId));
+  const sortedCaptionBattleEntries = [...captionBattleEntries].sort((a, b) => captionBattleSort === "top" ? b.vote_count - a.vote_count || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at));
   const unreadConversationCount = inboxConversations.filter(item => item.unreadCount > 0).length;
   const filteredInboxConversations = inboxConversations.filter(item => (inboxFilter !== "unread" || item.unreadCount > 0) && `${item.displayName} ${item.username} ${item.lastMessage}`.toLowerCase().includes(inboxSearch.trim().toLowerCase()));
   const feedReels = reelFeedMode === "following" ? liveReels.filter(post => followedCreatorIds.has(postAuthors[post.author_id]?.username || "")) : reelFeedMode === "live" ? [] : liveReels;
@@ -1243,6 +1273,106 @@ export default function HomePage() {
   }
 
 
+  const loadCaptionBattle = useCallback(async () => {
+    if (!userId) {
+      setCaptionBattleEntries([]);
+      setCaptionBattleVotedIds([]);
+      setCaptionBattleLoading(false);
+      return;
+    }
+    setCaptionBattleLoading(true);
+    try {
+      const supabase = createClient();
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase.from("zeechat_caption_battles")
+        .select("id,author_id,challenge_date,caption,vote_count,created_at")
+        .eq("challenge_date", today)
+        .order("vote_count", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      const rows = (data ?? []) as Omit<CaptionBattleEntry, "displayName" | "username" | "avatarUrl">[];
+      const authorIds = [...new Set(rows.map(entry => entry.author_id))];
+      const authors: Record<string, { username: string; display_name: string; avatar_url?: string | null }> = {};
+      if (authorIds.length) {
+        const { data: authorRows, error: authorError } = await supabase.from("zeechat_profiles")
+          .select("user_id,username,display_name,avatar_url")
+          .in("user_id", authorIds);
+        if (authorError) throw authorError;
+        for (const author of authorRows ?? []) authors[author.user_id] = author;
+      }
+      const { data: votes, error: votesError } = await supabase.from("zeechat_caption_battle_votes")
+        .select("entry_id").eq("voter_id", userId);
+      if (votesError) throw votesError;
+      setCaptionBattleEntries(rows.map(entry => ({
+        ...entry,
+        displayName: authors[entry.author_id]?.display_name || (entry.author_id === userId ? profile?.display_name || "You" : "ZeeChat member"),
+        username: authors[entry.author_id]?.username || (entry.author_id === userId ? profile?.username || "you" : "member"),
+        avatarUrl: authors[entry.author_id]?.avatar_url || null,
+      })));
+      setCaptionBattleVotedIds((votes ?? []).map(vote => vote.entry_id));
+    } catch (error) {
+      setNotice(error instanceof Error ? "Caption Battle couldn’t load: " + error.message : "Caption Battle couldn’t load. Please try again.");
+    } finally {
+      setCaptionBattleLoading(false);
+    }
+  }, [userId, profile]);
+
+  useEffect(() => {
+    if (view === "Play") void loadCaptionBattle();
+  }, [view, loadCaptionBattle]);
+
+  async function submitCaptionBattleEntry(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!userId) { setNotice("Sign in to enter today’s Caption Battle."); return; }
+    const text = captionBattleDraft.trim();
+    if (text.length < 3 || text.length > 240) { setNotice("Your caption must be between 3 and 240 characters."); return; }
+    setCaptionBattleSubmitting(true);
+    try {
+      const supabase = createClient();
+      const today = new Date().toISOString().slice(0, 10);
+      const { error } = await supabase.from("zeechat_caption_battles").insert({
+        author_id: userId, challenge_date: today, caption: text,
+      });
+      if (error) {
+        if (error.code === "23505") { setNotice("You’ve already entered today. Vote for someone else’s caption!"); await loadCaptionBattle(); return; }
+        throw error;
+      }
+      setCaptionBattleDraft("");
+      setNotice("You’re in! Now vote for your favorite caption.");
+      await loadCaptionBattle();
+    } catch (error) {
+      setNotice(error instanceof Error ? "Couldn’t submit your caption: " + error.message : "Couldn’t submit your caption. Please try again.");
+    } finally {
+      setCaptionBattleSubmitting(false);
+    }
+  }
+
+  async function voteForCaptionBattleEntry(entry: CaptionBattleEntry) {
+    if (!userId) { setNotice("Sign in to vote in Caption Battle."); return; }
+    if (entry.author_id === userId) { setNotice("You can’t vote for your own caption."); return; }
+    if (captionBattleVotedIds.includes(entry.id) || captionBattleBusyIds.includes(entry.id)) return;
+    setCaptionBattleBusyIds(current => [...current, entry.id]);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("zeechat_caption_battle_votes").insert({ entry_id: entry.id, voter_id: userId });
+      if (error) {
+        if (error.code === "23505") {
+          setCaptionBattleVotedIds(current => current.includes(entry.id) ? current : [...current, entry.id]);
+          setNotice("You’ve already voted for this caption.");
+          return;
+        }
+        throw error;
+      }
+      setCaptionBattleVotedIds(current => [...current, entry.id]);
+      setCaptionBattleEntries(current => current.map(item => item.id === entry.id ? { ...item, vote_count: item.vote_count + 1 } : item));
+    } catch (error) {
+      setNotice(error instanceof Error ? "Couldn’t save your vote: " + error.message : "Couldn’t save your vote. Please try again.");
+    } finally {
+      setCaptionBattleBusyIds(current => current.filter(id => id !== entry.id));
+    }
+  }
+
   async function shareDailyPrompt() {
     const message = `Today’s ZeeChat community prompt: “${getDailyCommunityPrompt()}” — join the conversation at ${window.location.origin}`;
     try {
@@ -1379,6 +1509,45 @@ export default function HomePage() {
               </div>
             </div>
           )}
+          <section className="caption-battle-panel" aria-labelledby="caption-battle-title">
+            <div className="caption-battle-header">
+              <div>
+                <span className="eyebrow">DAILY COMMUNITY BATTLE</span>
+                <h2 id="caption-battle-title">Caption Battle <span>🔥</span></h2>
+                <p>{getDailyCaptionPrompt()}</p>
+              </div>
+              <div className="caption-battle-today"><span>{captionBattleEntries.length}</span><small>captions today</small></div>
+            </div>
+            {!userId ? (
+              <div className="caption-battle-empty"><b>Your people are waiting.</b><p>Sign in to enter the daily battle and vote for the funniest caption.</p></div>
+            ) : (
+              <>
+                {!captionBattleHasEntered ? (
+                  <form className="caption-battle-form" onSubmit={submitCaptionBattleEntry}>
+                    <label htmlFor="caption-battle-draft">Your one-liner</label>
+                    <textarea id="caption-battle-draft" value={captionBattleDraft} onChange={event => setCaptionBattleDraft(event.target.value)} placeholder="Make it funny. Make it memorable…" maxLength={240} rows={3} />
+                    <div className="caption-battle-form-footer"><small>{captionBattleDraft.trim().length}/240 · one entry per day</small><button type="submit" disabled={captionBattleSubmitting || captionBattleDraft.trim().length < 3}>{captionBattleSubmitting ? "Submitting…" : "Enter the battle"} <ArrowLeft size={15} className="caption-battle-submit-arrow"/></button></div>
+                  </form>
+                ) : <div className="caption-battle-entered"><Check size={17}/><span>You’re in today’s battle. Cast a vote for someone else’s caption!</span></div>}
+                <div className="caption-battle-toolbar"><b>Today’s captions</b><div><button type="button" className={captionBattleSort === "top" ? "active" : ""} onClick={() => setCaptionBattleSort("top")}>Top</button><button type="button" className={captionBattleSort === "new" ? "active" : ""} onClick={() => setCaptionBattleSort("new")}>Newest</button></div></div>
+                {captionBattleLoading ? <div className="caption-battle-empty">Loading today’s captions…</div> : sortedCaptionBattleEntries.length === 0 ? <div className="caption-battle-empty"><b>Be the first to make the room laugh.</b><p>Drop the first caption for today’s prompt.</p></div> : (
+                  <div className="caption-battle-list">
+                    {sortedCaptionBattleEntries.map((entry, rank) => {
+                      const ownEntry = entry.author_id === userId;
+                      const voted = captionBattleVotedIds.includes(entry.id);
+                      const voteBusy = captionBattleBusyIds.includes(entry.id);
+                      return <article className="caption-battle-entry" key={entry.id}>
+                        <div className="caption-battle-rank>{captionBattleSort === "top" && entry.vote_count > 0 ? (rank === 0 ? "🏆" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "#" + (rank + 1)) : "💬"}</div>
+                        <div className="caption-battle-entry-copy"><p>{entry.caption}</p><div><b>{ownEntry ? "You" : entry.displayName}</b><span>@{entry.username}</span></div></div>
+                        <button type="button" className={voted ? "caption-battle-vote voted" : "caption-battle-vote"} disabled={ownEntry || voted || voteBusy} onClick={() => void voteForCaptionBattleEntry(entry)} aria-label={ownEntry ? "Your caption" : voted ? "You voted for this caption" : "Vote for this caption"}><Heart size={15} fill={voted ? "currentColor" : "none"}/><span>{entry.vote_count}</span><small>{ownEntry ? "Yours" : voted ? "Voted" : voteBusy ? "Saving…" : "Vote"}</small></button>
+                      </article>;
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+            <div className="caption-battle-footnote"><ShieldCheck size={14}/> One entry per person daily · one vote per caption · no voting for yourself</div>
+          </section>
           <div className="feature-grid play-coming-soon">
             <article className="feature-card"><div className="feature-emoji">😂</div><h3>Caption This</h3><p>Turn a photo into the funniest line in the room.</p><button onClick={() => setNotice("Caption battles are next on the ZeeChat Play roadmap.")}>Coming next ↗</button></article>
             <article className="feature-card"><div className="feature-emoji">🎤</div><h3>Voice Room Roulette</h3><p>Meet people through shared interests and conversation.</p><button onClick={() => setNotice("Voice Room Roulette is planned for a future release.")}>Coming next ↗</button></article>
