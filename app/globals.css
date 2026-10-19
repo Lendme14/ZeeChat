@@ -1033,3 +1033,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .reels-view.immersive-reels .reel-caption-heading>p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .reels-view.immersive-reels .reel-caption-heading.caption-expanded>p{display:block;overflow:visible}
 .reels-view.immersive-reels .reel-caption-toggle{margin-top:3px;padding:2px 0;border:0;background:transparent;color:#fff;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+
+
+/* Expandable community post captions */
+.post-caption-toggle{display:inline-flex;align-items:center;margin-top:3px;padding:0;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.post-caption-toggle:hover{color:var(--text)}
