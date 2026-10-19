@@ -261,14 +261,45 @@ export default function HomePage() {
   }, [userId]);
 
   useEffect(() => {
+    let active = true;
+    const key = `zeechat-trivia-stats-${userId ?? "guest"}`;
+    let localStats: TriviaStats = { bestScore: 0, streak: 0, lastPlayed: "" };
     try {
-      const key = `zeechat-trivia-stats-${userId ?? "guest"}`;
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<TriviaStats>;
-        setTriviaStats({ bestScore: Number(parsed.bestScore) || 0, streak: Number(parsed.streak) || 0, lastPlayed: typeof parsed.lastPlayed === "string" ? parsed.lastPlayed : "" });
-      } else setTriviaStats({ bestScore: 0, streak: 0, lastPlayed: "" });
-    } catch { setTriviaStats({ bestScore: 0, streak: 0, lastPlayed: "" }); }
+        localStats = { bestScore: Number(parsed.bestScore) || 0, streak: Number(parsed.streak) || 0, lastPlayed: typeof parsed.lastPlayed === "string" ? parsed.lastPlayed : "" };
+      }
+    } catch { /* Keep clean defaults if local storage is unavailable. */ }
+    if (active) setTriviaStats(localStats);
+    if (!userId) return () => { active = false; };
+    void (async () => {
+      const { data, error } = await createClient().from("zeechat_trivia_stats")
+        .select("best_score,streak,last_played")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!active || error || !data) return;
+      const remoteStats: TriviaStats = {
+        bestScore: Number(data.best_score) || 0,
+        streak: Number(data.streak) || 0,
+        lastPlayed: typeof data.last_played === "string" ? data.last_played : "",
+      };
+      const localIsNewer = localStats.lastPlayed > remoteStats.lastPlayed;
+      const merged: TriviaStats = {
+        bestScore: Math.max(localStats.bestScore, remoteStats.bestScore),
+        streak: localIsNewer ? localStats.streak : localStats.lastPlayed === remoteStats.lastPlayed ? Math.max(localStats.streak, remoteStats.streak) : remoteStats.streak,
+        lastPlayed: localIsNewer ? localStats.lastPlayed : remoteStats.lastPlayed,
+      };
+      setTriviaStats(merged);
+      try { localStorage.setItem(key, JSON.stringify(merged)); } catch { /* Database remains the durable copy. */ }
+      if (localIsNewer || merged.bestScore > remoteStats.bestScore) {
+        await createClient().from("zeechat_trivia_stats").upsert({
+          user_id: userId, best_score: merged.bestScore, streak: merged.streak,
+          last_played: merged.lastPlayed || null, updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+      }
+    })();
+    return () => { active = false; };
   }, [userId]);
 
   const captionBattleHasEntered = Boolean(userId && captionBattleEntries.some(entry => entry.author_id === userId));
@@ -1262,6 +1293,17 @@ export default function HomePage() {
     };
     setTriviaStats(nextStats);
     try { localStorage.setItem(storageKey, JSON.stringify(nextStats)); } catch { /* Keep the result visible if storage is unavailable. */ }
+    if (userId) {
+      void createClient().from("zeechat_trivia_stats").upsert({
+        user_id: userId,
+        best_score: nextStats.bestScore,
+        streak: nextStats.streak,
+        last_played: nextStats.lastPlayed,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" }).then(({ error }) => {
+        if (error) setNotice("Trivia saved on this device, but cloud sync failed. Your next result will retry.");
+      });
+    }
     setTriviaStarted(false);
     setTriviaFinished(true);
   }
@@ -1521,7 +1563,7 @@ export default function HomePage() {
               <div className="trivia-rules">
                 <span><Check size={16}/> 5 multiple-choice questions</span>
                 <span><Check size={16}/> Instant answer explanations</span>
-                <span><Check size={16}/> Personal best and streak saved on this device</span>
+                <span><Check size={16}/> Personal best and streak sync across devices when signed in</span>
               </div>
               <button className="trivia-primary-button" onClick={startTrivia}>Start today&apos;s challenge <ArrowLeft size={17} className="trivia-start-arrow"/></button>
             </div>
