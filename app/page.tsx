@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, CalendarClock, Check, CheckCheck, Compass, Eye, Film, Gamepad2, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, VolumeX } from "lucide-react";
+import { ArrowLeft, Bell, CalendarClock, Check, CheckCheck, Compass, Eye, Film, Gamepad2, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, VolumeX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 function formatVideoTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const total = Math.floor(seconds); return Math.floor(total / 60) + ":" + String(total % 60).padStart(2, "0"); }
@@ -13,7 +13,8 @@ type ZeeSound = { id: string; creator_id: string; title: string; audio_url: stri
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; };
-type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null };
+type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
 type InboxConversation = { id: string; otherUserId: string; username: string; displayName: string; avatarUrl: string | null; lastMessage: string; lastAt: string | null };
 const sampleReels = [
   { user: "mira.moves", caption: "POV: the group chat finally makes it outside 😂✨", tags: "#goodvibes #weekendenergy", sound: "original audio · Mira", image: "photo-1533174072545-7a4b6ad7a6c3", likes: "24.8K", comments: "1,204", initial: "M" },
@@ -103,6 +104,9 @@ export default function HomePage() {
   const [creatorFollowState, setCreatorFollowState] = useState<Record<string, boolean>>({});
   const [followBusy, setFollowBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<ZeeNotification[]>([]);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [activeChat, setActiveChat] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
@@ -417,6 +421,109 @@ export default function HomePage() {
     };
   }, [userId, activeConversationId, activeChat]);
 
+
+  useEffect(() => {
+    if (!userId) {
+      setNotifications([]);
+      setUnreadMessageCount(0);
+      return;
+    }
+    const supabase = createClient();
+    let active = true;
+    const refreshUnreadMessages = async () => {
+      const { count, error } = await supabase.from("zeechat_messages")
+        .select("id", { count: "exact", head: true })
+        .neq("sender_id", userId)
+        .is("read_at", null);
+      if (active && !error) setUnreadMessageCount(count ?? 0);
+    };
+    const loadNotifications = async () => {
+      const { data, error } = await supabase.from("zeechat_notifications")
+        .select("id,recipient_id,actor_id,kind,title,body,entity_id,source_id,created_at,read_at")
+        .eq("recipient_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (active && !error) setNotifications((data ?? []) as ZeeNotification[]);
+      if (error) console.error("Unable to load notifications", error);
+    };
+    void loadNotifications();
+    void refreshUnreadMessages();
+    const channel = supabase.channel("zeechat-user-activity-" + userId)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "zeechat_notifications",
+        filter: "recipient_id=eq." + userId
+      }, payload => {
+        if (!active) return;
+        const incoming = payload.new as ZeeNotification;
+        if (!incoming?.id) return;
+        const isOpenConversation = incoming.kind === "message" && Boolean(incoming.entity_id) && activeConversationRef.current === incoming.entity_id;
+        const notification = isOpenConversation ? { ...incoming, read_at: new Date().toISOString() } : incoming;
+        setNotifications(current => current.some(item => item.id === notification.id)
+          ? current.map(item => item.id === notification.id ? { ...item, read_at: item.read_at ?? notification.read_at } : item)
+          : [notification, ...current].slice(0, 50));
+        if (isOpenConversation) {
+          void supabase.from("zeechat_notifications").update({ read_at: notification.read_at })
+            .eq("id", notification.id).eq("recipient_id", userId);
+        }
+        void refreshUnreadMessages();
+        void loadInbox(userId);
+      })
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "zeechat_messages"
+      }, payload => {
+        if (!active) return;
+        const incoming = payload.new as LiveMessage;
+        if (!incoming?.id || incoming.sender_id === userId) return;
+        void loadInbox(userId);
+        void refreshUnreadMessages();
+        if (activeConversationRef.current === incoming.conversation_id) {
+          setLiveMessages(current => current.some(message => message.id === incoming.id)
+            ? current
+            : [...current.filter(message => !(message.id.startsWith("optimistic-") && message.sender_id === incoming.sender_id && message.body === incoming.body)), incoming]
+              .sort((a, b) => a.created_at.localeCompare(b.created_at)));
+          void supabase.from("zeechat_messages").update({ read_at: new Date().toISOString() })
+            .eq("id", incoming.id).eq("conversation_id", incoming.conversation_id)
+            .then(() => refreshUnreadMessages());
+        }
+      })
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  async function markAllNotificationsRead() {
+    if (!userId) return;
+    const now = new Date().toISOString();
+    const { error } = await createClient().from("zeechat_notifications")
+      .update({ read_at: now }).eq("recipient_id", userId).is("read_at", null);
+    if (error) {
+      setNotice("Could not mark notifications as read. Please try again.");
+      return;
+    }
+    setNotifications(current => current.map(item => item.read_at ? item : { ...item, read_at: now }));
+  }
+
+  async function openNotification(item: ZeeNotification) {
+    if (userId && !item.read_at) {
+      const now = new Date().toISOString();
+      const { error } = await createClient().from("zeechat_notifications")
+        .update({ read_at: now }).eq("id", item.id).eq("recipient_id", userId);
+      if (!error) setNotifications(current => current.map(row => row.id === item.id ? { ...row, read_at: now } : row));
+    }
+    setNotificationsOpen(false);
+    if (item.kind === "message") {
+      setActiveChat(false);
+      setActiveConversationId(null);
+      activeConversationRef.current = null;
+      setView("Chats");
+      if (userId) void loadInbox(userId);
+    } else {
+      setView("Home");
+    }
+  }
+
   async function loadInbox(currentUserId: string) {
     const requestId = ++inboxLoadRequestRef.current;
     const isLatestRequest = () => requestId === inboxLoadRequestRef.current;
@@ -434,7 +541,7 @@ export default function HomePage() {
       const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", otherIds);
       if (profileError) throw profileError;
       if (!isLatestRequest()) return;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at").in("conversation_id", conversationIds).order("created_at", { ascending: false });
       if (messageError) throw messageError;
       if (!isLatestRequest()) return;
       const latest: Record<string, LiveMessage> = {}; for (const message of (messages ?? []) as LiveMessage[]) if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
@@ -455,11 +562,16 @@ export default function HomePage() {
     try {
       const supabase = createClient();
       const { data: messages, error } = await supabase.from("zeechat_messages")
-        .select("id,conversation_id,sender_id,body,created_at")
+        .select("id,conversation_id,sender_id,body,created_at,read_at")
         .eq("conversation_id", item.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
       if (requestId !== chatOpenRequestRef.current) return;
+      const readAt = new Date().toISOString();
+      await supabase.from("zeechat_messages").update({ read_at: readAt }).eq("conversation_id", item.id).neq("sender_id", userId).is("read_at", null);
+      void supabase.from("zeechat_notifications").update({ read_at: readAt }).eq("recipient_id", userId).eq("entity_id", item.id).eq("kind", "message").is("read_at", null);
+      setNotifications(current => current.map(n => n.kind === "message" && n.entity_id === item.id && !n.read_at ? { ...n, read_at: readAt } : n));
+      setUnreadMessageCount(current => Math.max(0, current - (messages ?? []).filter((message: LiveMessage) => message.sender_id !== userId && !(message as LiveMessage).read_at).length));
       setSelectedCreator({ username: item.username, initial: (item.displayName[0] || "Z").toUpperCase(), avatarUrl: item.avatarUrl });
       activeConversationRef.current = item.id;
       setActiveConversationId(item.id);
@@ -486,7 +598,7 @@ export default function HomePage() {
       const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });
       if (error) throw error;
       const id=conversationId as string;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at").eq("conversation_id",id).order("created_at",{ascending:true});
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at").eq("conversation_id",id).order("created_at",{ascending:true});
       if (messageError) throw messageError;
       const { data: targetProfile } = await supabase.from("zeechat_profiles").select("avatar_url").eq("user_id",targetUserId).maybeSingle();
       if (requestId !== chatOpenRequestRef.current) return;
@@ -505,7 +617,7 @@ export default function HomePage() {
     setChatDraft("");
     try {
       const supabase=createClient();
-      const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at").single();
+      const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body}).select("id,conversation_id,sender_id,body,created_at,read_at").single();
       if(error) throw error;
       if (activeConversationRef.current === conversationId) {
         setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message));
@@ -981,17 +1093,21 @@ export default function HomePage() {
     <aside className="sidebar">
       <a className="brand" href="#"><span className="brand-mark">z</span><span>Zee<b>Chat</b></span></a>
       <p className="side-label">YOUR SPACE</p>
-      {nav.map(({ name, icon: Icon }) => <button key={name} className={view === name ? "nav-link active" : "nav-link"} onClick={() => setView(name)}><Icon size={19}/><span>{name}</span>{name === "Chats" && <i className="unread"/>}</button>)}
+      {nav.map(({ name, icon: Icon }) => <button key={name} className={view === name ? "nav-link active" : "nav-link"} onClick={() => setView(name)}><Icon size={19}/><span>{name}</span>{name === "Chats" && unreadMessageCount > 0 && <i className="unread-count-badge">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</i>}</button>)}
       <div className="sidebar-bottom"><div className="sidebar-promo"><Sparkles size={18}/><b>Make a little magic.</b><p>Your next favourite memory starts with a hello.</p><button onClick={() => setCreateOpen(true)}>Create something <Plus size={15}/></button></div>{userId && <button type="button" className="nav-link sign-out-button" onClick={async () => { try { const { error } = await createClient().auth.signOut(); if (error) throw error; setView("Home"); setNotice("You have been signed out."); } catch (error) { setNotice(error instanceof Error ? `Could not sign out: ${error.message}` : "Could not sign out. Please try again."); } }}><LogOut size={19}/><span>Sign out</span></button>}<small>© 2026 ZeeChat · Good vibes only</small></div>
     </aside>
     <section className="main-column">
 
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
+      {notificationsOpen && <section className="notification-center" aria-label="Notifications" aria-live="polite">
+        <header className="notification-center-header"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>Notifications</h2><p>{notifications.filter(item => !item.read_at).length ? `${notifications.filter(item => !item.read_at).length} unread` : "You’re all caught up"}</p></div><div className="notification-center-actions">{notifications.some(item => !item.read_at) && <button type="button" onClick={() => void markAllNotificationsRead()}>Mark all read</button>}<button type="button" className="notification-close" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}>×</button></div></header>
+        {!userId ? <p className="notification-empty">Sign in to see your notifications.</p> : notifications.length ? <div className="notification-list">{notifications.map(item => <button type="button" key={item.id} className={`notification-item ${item.read_at ? "" : "is-unread"}`} onClick={() => void openNotification(item)}><span className={`notification-kind-icon notification-kind-${item.kind}`}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">No notifications yet. New messages, follows, comments and likes will show up here.</p>}
+      </section>}
       {uploadProgress !== null && <div className="upload-progress-card" role="status" aria-live="polite">
         <div className="upload-progress-ring" style={{background: `conic-gradient(#45d6a0 ${uploadProgress * 3.6}deg, #263a33 0deg)`}} aria-label={`Upload ${uploadProgress}% complete`}><span>{uploadProgress}%</span></div>
         <div className="upload-progress-copy"><b>{uploadLabel || "Publishing your video…"}</b><small>You can keep browsing ZeeChat while this finishes.</small><div className="upload-progress-track"><span style={{width: uploadProgress + "%"}}/></div></div>
       </div>}
-      {view === "Home" && <section className="home-feed-view"><div className="home-feed-heading"><div><span className="eyebrow">YOUR COMMUNITY</span><h1>Home <span className="home-heading-chevron">⌄</span></h1></div><div className="home-feed-actions"><button className="home-watch-reels" onClick={() => setView("Reels")}><Video size={16}/><span>Reels</span></button><button aria-label="Search" onClick={() => setView("Discover")}><Search size={19}/></button><button aria-label="Notifications" onClick={() => setNotice("Notifications will appear here when activity alerts are connected.")}><Sparkles size={18}/></button></div></div><div className="home-story-strip"><button className="home-story-add" onClick={() => setCreateOpen(true)}><span>＋</span><small>Your story</small></button>{[{name:"Karma Hossain",initial:"K"},{name:"Mira James",initial:"M"},{name:"Jay Creates",initial:"J"},{name:"Tomi Laughs",initial:"T"},{name:"Amara",initial:"A"},{name:"David",initial:"D"}].map((person,i)=><button key={person.name} className="home-story" onClick={() => setNotice("Stories are a visual preview and are not published yet.")}><span className={"home-story-avatar tone-"+i}>{person.initial}</span><small>{person.name.split(" ")[0]}</small></button>)}</div><section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id} data-post-id={p.id}><div className="post-avatar">{postAuthors[p.author_id]?.avatar_url ? <img className="post-avatar-image" src={postAuthors[p.author_id].avatar_url!} alt="" /> : (postAuthors[p.author_id]?.display_name?.[0] || postAuthors[p.author_id]?.username?.[0] || "z").toUpperCase()}</div><div className="post-body"><b>{postAuthors[p.author_id]?.display_name || postAuthors[p.author_id]?.username || "ZeeChat member"} <span className="post-username">{postAuthors[p.author_id]?.username ? `@${postAuthors[p.author_id].username}` : ""}</span></b><div className="post-meta-row"><small>{new Date(p.created_at).toLocaleString()}</small>{p.author_id === userId && <ContentActionMenu label="post" disabled={busy} onDelete={() => void deletePost(p)} />}</div>{p.caption && <><p>{expandedCaptions.includes(p.id) || p.caption.length <= 240 ? p.caption : p.caption.slice(0, 240).trimEnd() + "…"}</p>{p.caption.length > 240 && <button type="button" className="post-caption-toggle" onClick={() => setExpandedCaptions(current => current.includes(p.id) ? current.filter(id => id !== p.id) : [...current, p.id])}>{expandedCaptions.includes(p.id) ? "Show less" : "Read more"}</button>}</>}{p.post_type === "reel" && p.media_url ? <button type="button" className="home-reel-thumbnail" onClick={() => { setActiveReelPostId(p.id); setView("Reels"); }} aria-label="Play Reel"><img className="community-post-image" src={p.thumbnail_url || p.media_url} alt="Reel thumbnail" loading="lazy" /><span className="home-reel-play"><Video size={25} fill="currentColor"/></span><small>PLAY REEL</small></button> : p.media_url && p.post_type !== "video" ? <img className="community-post-image" src={p.media_url} alt="Image shared in a ZeeChat post" loading="lazy" /> : null}<div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button><span className="post-view-count" aria-label={`${(postViewCounts[p.id] ?? 0).toLocaleString()} views`}><Eye size={16}/><span>{(postViewCounts[p.id] ?? 0).toLocaleString()}</span></span></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small>{comment.author_id === userId && <ContentActionMenu label="comment" onDelete={() => void deleteComment(comment)} />}<p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">No community posts yet. Be the first to share something.</p>}</section></section>}
+      {view === "Home" && <section className="home-feed-view"><div className="home-feed-heading"><div><span className="eyebrow">YOUR COMMUNITY</span><h1>Home <span className="home-heading-chevron">⌄</span></h1></div><div className="home-feed-actions"><button className="home-watch-reels" onClick={() => setView("Reels")}><Video size={16}/><span>Reels</span></button><button aria-label="Search" onClick={() => setView("Discover")}><Search size={19}/></button><button className="home-notification-button" aria-label={`Notifications${notifications.filter(item => !item.read_at).length ? `, ${notifications.filter(item => !item.read_at).length} unread` : ""}`} onClick={() => setNotificationsOpen(value => !value)}><Bell size={19}/>{notifications.some(item => !item.read_at) && <span className="notification-count-badge">{notifications.filter(item => !item.read_at).length > 99 ? "99+" : notifications.filter(item => !item.read_at).length}</span>}</button></div></div><div className="home-story-strip"><button className="home-story-add" onClick={() => setCreateOpen(true)}><span>＋</span><small>Your story</small></button>{[{name:"Karma Hossain",initial:"K"},{name:"Mira James",initial:"M"},{name:"Jay Creates",initial:"J"},{name:"Tomi Laughs",initial:"T"},{name:"Amara",initial:"A"},{name:"David",initial:"D"}].map((person,i)=><button key={person.name} className="home-story" onClick={() => setNotice("Stories are a visual preview and are not published yet.")}><span className={"home-story-avatar tone-"+i}>{person.initial}</span><small>{person.name.split(" ")[0]}</small></button>)}</div><section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id} data-post-id={p.id}><div className="post-avatar">{postAuthors[p.author_id]?.avatar_url ? <img className="post-avatar-image" src={postAuthors[p.author_id].avatar_url!} alt="" /> : (postAuthors[p.author_id]?.display_name?.[0] || postAuthors[p.author_id]?.username?.[0] || "z").toUpperCase()}</div><div className="post-body"><b>{postAuthors[p.author_id]?.display_name || postAuthors[p.author_id]?.username || "ZeeChat member"} <span className="post-username">{postAuthors[p.author_id]?.username ? `@${postAuthors[p.author_id].username}` : ""}</span></b><div className="post-meta-row"><small>{new Date(p.created_at).toLocaleString()}</small>{p.author_id === userId && <ContentActionMenu label="post" disabled={busy} onDelete={() => void deletePost(p)} />}</div>{p.caption && <><p>{expandedCaptions.includes(p.id) || p.caption.length <= 240 ? p.caption : p.caption.slice(0, 240).trimEnd() + "…"}</p>{p.caption.length > 240 && <button type="button" className="post-caption-toggle" onClick={() => setExpandedCaptions(current => current.includes(p.id) ? current.filter(id => id !== p.id) : [...current, p.id])}>{expandedCaptions.includes(p.id) ? "Show less" : "Read more"}</button>}</>}{p.post_type === "reel" && p.media_url ? <button type="button" className="home-reel-thumbnail" onClick={() => { setActiveReelPostId(p.id); setView("Reels"); }} aria-label="Play Reel"><img className="community-post-image" src={p.thumbnail_url || p.media_url} alt="Reel thumbnail" loading="lazy" /><span className="home-reel-play"><Video size={25} fill="currentColor"/></span><small>PLAY REEL</small></button> : p.media_url && p.post_type !== "video" ? <img className="community-post-image" src={p.media_url} alt="Image shared in a ZeeChat post" loading="lazy" /> : null}<div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button><span className="post-view-count" aria-label={`${(postViewCounts[p.id] ?? 0).toLocaleString()} views`}><Eye size={16}/><span>{(postViewCounts[p.id] ?? 0).toLocaleString()}</span></span></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small>{comment.author_id === userId && <ContentActionMenu label="comment" onDelete={() => void deleteComment(comment)} />}<p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">No community posts yet. Be the first to share something.</p>}</section></section>}
       {view === "Reels" && <section className="reels-view immersive-reels">
         <div className="reel-layout"><div key={reel.postId || reel.user} className="reel-player reel-enter" data-reel-index={index} onTouchStart={handleReelTouchStart} onTouchEnd={handleReelTouchEnd} onWheel={event => { if (Math.abs(event.deltaY) < 18) return; const now = Date.now(); if (now - lastWheelAt.current < 520) return; lastWheelAt.current = now; moveReel(event.deltaY > 0 ? 1 : -1); }} onKeyDown={event => { if (event.key === "ArrowDown") moveReel(1); if (event.key === "ArrowUp") moveReel(-1); }} tabIndex={0} aria-label="Reel viewer. Swipe up or down to change videos." style={!reel.mediaUrl ? { backgroundImage: `linear-gradient(0deg,#08070ddf,transparent 55%,#08070d55),url(https://images.unsplash.com/${reel.image}?auto=format&fit=crop&w=1000&q=85)` } : undefined}>{reel.mediaUrl && <>{selectedLiveReel?.media_url && /\.(jpe?g|png|webp|gif)(\?|$)/i.test(selectedLiveReel.media_url) ? <img className="live-reel-video" src={reel.mediaUrl} alt={reel.caption || "Photo Reel"} /> : <video ref={reelVideoRef} key={reel.postId || reel.mediaUrl} className="live-reel-video" src={reel.mediaUrl} autoPlay playsInline loop preload="auto" poster={selectedLiveReel?.thumbnail_url || undefined} onLoadedMetadata={event => { setReelDuration(event.currentTarget.duration || 0); setReelCurrentTime(event.currentTarget.currentTime || 0); }} onTimeUpdate={event => setReelCurrentTime(event.currentTarget.currentTime || 0)} onDurationChange={event => setReelDuration(event.currentTarget.duration || 0)} onError={() => setNotice("This video could not be loaded. Check the video file or try again.")} onClick={event => { event.stopPropagation(); const video = event.currentTarget; if (video.paused) void video.play().catch(() => setNotice("Tap the video to start playback.")); else video.pause(); }} />} <div className="reel-video-controls" onClick={event => event.stopPropagation()}><div className="reel-scrubber-row"><span>{formatVideoTime(reelCurrentTime)}</span><input aria-label="Seek through Reel" className="reel-scrubber" type="range" min={0} max={Math.max(reelDuration, 0.1)} step="0.1" value={Math.min(reelCurrentTime, reelDuration || 0)} style={{"--reel-progress": (reelDuration ? reelCurrentTime / reelDuration * 100 : 0) + "%"} as React.CSSProperties} onChange={event => { const time = Number(event.target.value); setReelCurrentTime(time); if (reelVideoRef.current) reelVideoRef.current.currentTime = time; }} /><span>{formatVideoTime(reelDuration)}</span></div></div></>}{selectedLiveReel?.sound_id && sounds.find(sound => sound.id === selectedLiveReel.sound_id) && <audio className="reel-sound-audio" src={sounds.find(sound => sound.id === selectedLiveReel.sound_id)?.audio_url} autoPlay loop />}
           <div className="immersive-reel-header"><div className="immersive-brand"><span className="immersive-brand-mark">z</span><span>Zee<b>Chat</b></span></div><div className="reel-feed-tabs" role="group" aria-label="Reel feed"><button className={reelFeedMode === "following" ? "selected" : ""} aria-pressed={reelFeedMode === "following"} onClick={() => {setReelFeedMode("following");setIndex(0);setActiveReelPostId(null);}}>Following</button><button className={reelFeedMode === "for-you" ? "selected" : ""} aria-pressed={reelFeedMode === "for-you"} onClick={() => {setReelFeedMode("for-you");setIndex(0);setActiveReelPostId(null);}}>For You</button><button className={reelFeedMode === "live" ? "selected" : ""} aria-pressed={reelFeedMode === "live"} onClick={() => {setReelFeedMode("live");setIndex(0);setActiveReelPostId(null);}}>Live</button></div><button className="immersive-search" aria-label="Search ZeeChat" onClick={() => setView("Discover")}><Search size={21}/></button></div><button className="sound-button" aria-label="Sound muted"><VolumeX size={18}/></button>
@@ -1016,7 +1132,7 @@ export default function HomePage() {
         <div className="party-bottom-cta"><div><span className="eyebrow">YOUR ROOM. YOUR RULES.</span><h2>Host the next <em>great night.</em></h2><p>Create a space for your people to hang out.</p></div><button className="create-button" onClick={() => setPartyCreateOpen(true)}><Plus size={18}/> Create party</button></div>
       </section>}
       {view === "Play" && <section className="content-view"><span className="eyebrow">BOREDOM DOESN&apos;T LIVE HERE</span><h1>Let&apos;s <em>play.</em></h1><p>Little games, big laughs, and people to share them with.</p><div className="feature-grid">{[["🧠","Quickfire Trivia","5 questions. How sharp are you?"],["😂","Caption This","Make the funniest caption win."],["🎤","Voice Room Roulette","Meet people around shared interests."]].map(x=><article className="feature-card" key={x[1]}><div className="feature-emoji">{x[0]}</div><h3>{x[1]}</h3><p>{x[2]}</p><button onClick={() => setNotice("This activity is a UI preview; scoring and rewards are not yet connected.")}>Join activity ↗</button></article>)}</div></section>}
-      {view === "Chats" && <section className={activeChat ? "content-view chat-view chat-detail-view" : "content-view chat-view"}>{activeChat ? <><header className="chat-detail-header"><button className="chat-back-button" onClick={() => {setActiveChat(false);setActiveConversationId(null);void loadInbox(userId ?? "");}} aria-label="Back to messages"><ArrowLeft size={20}/></button><button className="chat-contact" onClick={() => { if (selectedCreator?.username) setView("Profile"); else setNotice("This conversation has no linked creator profile."); }}><span className="chat-contact-avatar">{selectedCreator?.avatarUrl && !failedAvatarUrls.includes(selectedCreator.avatarUrl) ? <Image src={selectedCreator.avatarUrl} alt={`${selectedCreator.username} profile photo`} width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(selectedCreator.avatarUrl!) ? current : [...current, selectedCreator.avatarUrl!])}/> : (selectedCreator?.initial ?? "Z")}<i/></span><span><b>{selectedCreator?.username ?? "Conversation"}</b><small><i/> Direct message</small></span></button><button className="chat-more-button" onClick={() => setNotice("Conversation options: View profile, Search chat, Mute, Block and Report will be added with live messaging.")} aria-label="Conversation options"><MoreHorizontal size={22}/></button></header><div className="chat-timeline" aria-label="Conversation messages"><div className="chat-date-divider"><span>Today</span></div>{liveMessages.map(message=><div className={"chat-message-row "+(message.sender_id===userId ? "mine" : "theirs")} key={message.id}><div className="chat-message-content"><div className="chat-bubble">{message.body}</div><div className="chat-message-meta"><time>{new Date(message.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>{message.sender_id===userId && <Check size={13}/>}</div></div></div>)}{!liveMessages.length && <p className="chat-first-message">You’re connected. Send the first message.</p>}</div><form className="chat-composer" onSubmit={event => {event.preventDefault(); void sendLiveMessage();}}><button type="button" className="chat-attach-button" aria-label="Attachment options" onClick={() => setNotice("Photo, video and file attachments will be available when chat storage is connected.")}><Paperclip size={20}/></button><textarea rows={1} aria-label="Write a message" placeholder="Message ZeeChat…" value={chatDraft} maxLength={4000} onChange={event=>setChatDraft(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit();}}}/><button type="button" className="chat-emoji-button" aria-label="Emoji" onClick={()=>setChatDraft(draft=>draft+"😊")}><Smile size={19}/></button><button type="submit" className="chat-send-button" disabled={!chatDraft.trim()} aria-label="Send message"><Send size={18}/></button></form></> : <><div className="chat-heading"><div><span className="eyebrow">YOUR PEOPLE, YOUR SPACE</span><h1>Messages</h1><p>Keep good conversations going.</p></div><button className="chat-compose" onClick={() => setNotice("New conversations will be available when messaging is connected.")} aria-label="New message"><Plus size={20}/></button></div><div className="chat-search"><Search size={17}/><input aria-label="Search conversations" placeholder="Search conversations…" value={inboxSearch} onChange={event => setInboxSearch(event.target.value)}/>{inboxSearch && <button type="button" aria-label="Clear conversation search" onClick={() => setInboxSearch("")}>×</button>}</div><div className="chat-filter-row"><button className="chat-filter-active">All messages</button><button onClick={() => setNotice("Unread filtering will be available with live messaging.")}>Unread</button><button onClick={() => setNotice("Requests will appear when messaging is connected.")}>Requests</button></div>{filteredInboxConversations.length ? (<div className="chat-live-inbox">{filteredInboxConversations.map(item=><button type="button" className="chat-demo-thread" key={item.id} onClick={()=>void openExistingConversation(item)} disabled={chatLoading}><span className="chat-contact-avatar">{item.avatarUrl && !failedAvatarUrls.includes(item.avatarUrl) ? <Image src={item.avatarUrl} alt="" width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(item.avatarUrl!) ? current : [...current, item.avatarUrl!])}/> : (item.displayName[0]||"Z").toUpperCase()}<i/></span><span className="chat-demo-thread-copy"><b>{item.displayName}<small>{item.lastAt ? new Date(item.lastAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</small></b><span>{item.lastMessage}</span></span></button>)}</div>) : (inboxConversations.length && inboxSearch.trim() ? (<div className="chat-inbox-empty"><div className="chat-empty-art"><Search size={25}/></div><h2>No matching conversations</h2><p>Try another name, username, or message keyword.</p><button onClick={() => setInboxSearch("")}>Clear search <span>×</span></button></div>) : (<div className="chat-inbox-empty"><div className="chat-empty-art"><MessageCircle size={29}/></div><h2>No conversations yet</h2><p>Visit a creator’s profile and tap Message to start a real conversation.</p><button onClick={() => setView("Discover")}>Discover people <span>→</span></button></div>))}</>}</section>}
+      {view === "Chats" && <section className={activeChat ? "content-view chat-view chat-detail-view" : "content-view chat-view"}>{activeChat ? <><header className="chat-detail-header"><button className="chat-back-button" onClick={() => {setActiveChat(false);setActiveConversationId(null);activeConversationRef.current=null;void loadInbox(userId ?? "");}} aria-label="Back to messages"><ArrowLeft size={20}/></button><button className="chat-contact" onClick={() => { if (selectedCreator?.username) setView("Profile"); else setNotice("This conversation has no linked creator profile."); }}><span className="chat-contact-avatar">{selectedCreator?.avatarUrl && !failedAvatarUrls.includes(selectedCreator.avatarUrl) ? <Image src={selectedCreator.avatarUrl} alt={`${selectedCreator.username} profile photo`} width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(selectedCreator.avatarUrl!) ? current : [...current, selectedCreator.avatarUrl!])}/> : (selectedCreator?.initial ?? "Z")}<i/></span><span><b>{selectedCreator?.username ?? "Conversation"}</b><small><i/> Direct message</small></span></button><button className="chat-more-button" onClick={() => setNotice("Conversation options: View profile, Search chat, Mute, Block and Report will be added with live messaging.")} aria-label="Conversation options"><MoreHorizontal size={22}/></button></header><div className="chat-timeline" aria-label="Conversation messages"><div className="chat-date-divider"><span>Today</span></div>{liveMessages.map(message=><div className={"chat-message-row "+(message.sender_id===userId ? "mine" : "theirs")} key={message.id}><div className="chat-message-content"><div className="chat-bubble">{message.body}</div><div className="chat-message-meta"><time>{new Date(message.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>{message.sender_id===userId && <Check size={13}/>}</div></div></div>)}{!liveMessages.length && <p className="chat-first-message">You’re connected. Send the first message.</p>}</div><form className="chat-composer" onSubmit={event => {event.preventDefault(); void sendLiveMessage();}}><button type="button" className="chat-attach-button" aria-label="Attachment options" onClick={() => setNotice("Photo, video and file attachments will be available when chat storage is connected.")}><Paperclip size={20}/></button><textarea rows={1} aria-label="Write a message" placeholder="Message ZeeChat…" value={chatDraft} maxLength={4000} onChange={event=>setChatDraft(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit();}}}/><button type="button" className="chat-emoji-button" aria-label="Emoji" onClick={()=>setChatDraft(draft=>draft+"😊")}><Smile size={19}/></button><button type="submit" className="chat-send-button" disabled={!chatDraft.trim()} aria-label="Send message"><Send size={18}/></button></form></> : <><div className="chat-heading"><div><span className="eyebrow">YOUR PEOPLE, YOUR SPACE</span><h1>Messages</h1><p>Keep good conversations going.</p></div><button className="chat-compose" onClick={() => setNotice("New conversations will be available when messaging is connected.")} aria-label="New message"><Plus size={20}/></button></div><div className="chat-search"><Search size={17}/><input aria-label="Search conversations" placeholder="Search conversations…" value={inboxSearch} onChange={event => setInboxSearch(event.target.value)}/>{inboxSearch && <button type="button" aria-label="Clear conversation search" onClick={() => setInboxSearch("")}>×</button>}</div><div className="chat-filter-row"><button className="chat-filter-active">All messages</button><button onClick={() => setNotice("Unread filtering will be available with live messaging.")}>Unread</button><button onClick={() => setNotice("Requests will appear when messaging is connected.")}>Requests</button></div>{filteredInboxConversations.length ? (<div className="chat-live-inbox">{filteredInboxConversations.map(item=><button type="button" className="chat-demo-thread" key={item.id} onClick={()=>void openExistingConversation(item)} disabled={chatLoading}><span className="chat-contact-avatar">{item.avatarUrl && !failedAvatarUrls.includes(item.avatarUrl) ? <Image src={item.avatarUrl} alt="" width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(item.avatarUrl!) ? current : [...current, item.avatarUrl!])}/> : (item.displayName[0]||"Z").toUpperCase()}<i/></span><span className="chat-demo-thread-copy"><b>{item.displayName}<small>{item.lastAt ? new Date(item.lastAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</small></b><span>{item.lastMessage}</span></span></button>)}</div>) : (inboxConversations.length && inboxSearch.trim() ? (<div className="chat-inbox-empty"><div className="chat-empty-art"><Search size={25}/></div><h2>No matching conversations</h2><p>Try another name, username, or message keyword.</p><button onClick={() => setInboxSearch("")}>Clear search <span>×</span></button></div>) : (<div className="chat-inbox-empty"><div className="chat-empty-art"><MessageCircle size={29}/></div><h2>No conversations yet</h2><p>Visit a creator’s profile and tap Message to start a real conversation.</p><button onClick={() => setView("Discover")}>Discover people <span>→</span></button></div>))}</>}</section>}
       {view === "Profile" && selectedCreator ? <section className="content-view profile-view creator-preview-view">
         <button className="creator-preview-back" onClick={() => {setSelectedCreator(null);setView("Reels");}}><ArrowLeft size={17}/> Back to Reels</button>
         <div className="profile-cover" style={selectedCreatorProfile?.cover_url ? {backgroundImage:`linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.52)),url("${selectedCreatorProfile.cover_url}")`,backgroundSize:"cover",backgroundPosition:"center"} : undefined}><span>{selectedCreatorProfile?.cover_url ? "" : "✦ GOOD ENERGY ONLY"}</span></div>
