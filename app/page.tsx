@@ -142,7 +142,8 @@ export default function HomePage() {
       sessionStorage.setItem(storageKey, "1");
     } catch { /* Count this view for the current session even if storage is unavailable. */ }
     setPostViewCounts(current => ({ ...current, [postId]: (current[postId] ?? 0) + 1 }));
-    void supabase.from("zeechat_post_views").insert({ post_id: postId, viewer_id: userId });
+    const client = createClient();
+    void client.from("zeechat_post_views").insert({ post_id: postId, viewer_id: userId });
   }, [selectedLiveReel?.id, userId]);
 
   const reel = selectedLiveReel ? { user: postAuthors[selectedLiveReel.author_id]?.username || "zeechatter", caption: selectedLiveReel.caption, tags: "", sound: "original audio", image: "", likes: "0", comments: "0", initial: (postAuthors[selectedLiveReel.author_id]?.display_name || "Z").slice(0, 1).toUpperCase(), mediaUrl: selectedLiveReel.media_url || "", postId: selectedLiveReel.id } : { ...sampleReels[index], mediaUrl: "", postId: "" };
