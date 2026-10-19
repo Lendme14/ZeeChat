@@ -119,12 +119,6 @@ export default function HomePage() {
   const [creatorProfileLoading, setCreatorProfileLoading] = useState(false);
   const [selectedCreatorFollowCounts, setSelectedCreatorFollowCounts] = useState({ followers: 0, following: 0 });
   const [chatDraft, setChatDraft] = useState("");
-  const [demoMessages, setDemoMessages] = useState<{id:number; text:string; mine:boolean; time:string}[]>([
-    { id: 1, text: "Hey! Are you free later?", mine: false, time: "10:42 AM" },
-    { id: 2, text: "Yes, I’m free! What’s the plan?", mine: true, time: "10:43 AM" },
-    { id: 3, text: "I was thinking we could catch up and share some ideas.", mine: false, time: "10:44 AM" },
-    { id: 4, text: "That sounds good 😊", mine: true, time: "10:45 AM" },
-  ]);
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadLabel, setUploadLabel] = useState("");
@@ -183,8 +177,10 @@ export default function HomePage() {
 
   const reel = selectedLiveReel ? { user: postAuthors[selectedLiveReel.author_id]?.username || "zeechatter", caption: selectedLiveReel.caption, tags: "", sound: "original audio", image: "", likes: "0", comments: "0", initial: (postAuthors[selectedLiveReel.author_id]?.display_name || "Z").slice(0, 1).toUpperCase(), mediaUrl: selectedLiveReel.media_url || "", postId: selectedLiveReel.id } : { ...sampleReels[index], mediaUrl: "", postId: "" };
 
+  const selectedCreatorUsername = selectedCreator?.username;
+
   useEffect(() => {
-    if (view !== "Profile" || !selectedCreator) return;
+    if (view !== "Profile" || !selectedCreatorUsername) return;
     let active = true;
     setCreatorProfileLoading(true);
     setSelectedCreatorProfile(null);
@@ -195,7 +191,7 @@ export default function HomePage() {
         const supabase = createClient();
         const { data: creator, error } = await supabase.from("zeechat_profiles")
           .select("user_id,username,display_name,bio,avatar_url,cover_url")
-          .eq("username", selectedCreator.username).maybeSingle();
+          .eq("username", selectedCreatorUsername).maybeSingle();
         if (error) throw error;
         if (!creator) {
           if (active) {
@@ -237,7 +233,7 @@ export default function HomePage() {
     };
     void loadCreatorProfile();
     return () => { active = false; };
-  }, [view, selectedCreator?.username, userId]);
+  }, [view, selectedCreatorUsername, userId]);
 
   useEffect(() => {
     if (!mediaFile) { setMediaPreview(null); return; }
