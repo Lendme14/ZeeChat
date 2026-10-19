@@ -1233,3 +1233,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 @media(prefers-reduced-motion:reduce){.reel-like-burst{animation:none;opacity:1}.immersive-reels .action-circle{transition:none}}
 
 @media(max-width:700px){.immersive-reels .reel-layout{position:relative}}
+
+
+/* Saved Reel library and stronger feed discovery */
+.immersive-reels .saved-reel-action.saved .action-circle{color:#f3a4ff;background:#42234d;border-color:#a85fc4}
+.immersive-reels .saved-reel-action:disabled{opacity:.45;cursor:not-allowed}
+.immersive-reels .reel-feed-tabs{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.immersive-reels .reel-feed-tabs::-webkit-scrollbar{display:none}
+.saved-reels-empty{min-height:min(76vh,790px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px 24px;border:1px solid #ffffff17;border-radius:28px;background:radial-gradient(ellipse at 50% 34%,#38213f 0%,#17111e 47%,#0b0910 100%)}
+.saved-reels-empty .immersive-brand{align-self:flex-start}
+.saved-reels-empty-icon{width:82px;height:82px;margin-top:34px;display:grid;place-items:center;border:1px solid #c47be64d;border-radius:26px;color:#e5a4ff;background:#a34ad51b;box-shadow:0 15px 55px #9d46d12b}
+.saved-reels-empty h2{margin:22px 0 8px;font-size:clamp(24px,4vw,34px);letter-spacing:-1px}
+.saved-reels-empty p{max-width:370px;margin:0;color:#bdb2c9;font-size:14px;line-height:1.7}
+.saved-reels-empty>button{margin-top:22px;padding:12px 18px;border:0;border-radius:12px;background:linear-gradient(110deg,#ff5d9d,#a16bff);font-size:13px;font-weight:800}
+@media(max-width:700px){.saved-reels-empty{min-height:calc(100dvh - 128px);border-radius:0;border-left:0;border-right:0}.immersive-reels .reel-feed-tabs{flex:1;justify-content:flex-start}.immersive-reels .reel-feed-tabs button{white-space:nowrap}}
