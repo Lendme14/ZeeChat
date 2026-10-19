@@ -1,4 +1,4 @@
-const CACHE_NAME = "zeechat-shell-v2";
+const CACHE_NAME = "zeechat-shell-v3";
 const SHELL = ["/", "/manifest.json", "/icons/zeechat.svg"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -16,6 +16,20 @@ self.addEventListener("fetch", (event) => {
       if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put("/", response.clone()));
       return response;
     }).catch(async () => (await caches.match(request)) || (await caches.match("/")) || Response.error()));
+    return;
+  }
+  if (request.destination === "script" || request.destination === "style" || request.destination === "font" || url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(caches.open(CACHE_NAME).then(async (cache) => {
+      const cached = await cache.match(request);
+      try {
+        const response = await fetch(request);
+        if (response.ok && response.type === "basic") await cache.put(request, response.clone());
+        return response;
+      } catch {
+        if (cached) return cached;
+        return Response.error();
+      }
+    }));
     return;
   }
   if (url.pathname === "/manifest.json" || url.pathname.startsWith("/icons/")) {
