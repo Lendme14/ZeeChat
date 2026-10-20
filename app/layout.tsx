@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import NetworkStatus from "./components/NetworkStatus";
 
 export const metadata: Metadata = {
   title: "ZeeChat — Find your people",
@@ -20,5 +21,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}<script dangerouslySetInnerHTML={{__html: `if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {})); }`}} /></body></html>;
+  return <html lang="en"><body><NetworkStatus />{children}<script dangerouslySetInnerHTML={{__html: `if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {})); }`}} /></body></html>;
 }
