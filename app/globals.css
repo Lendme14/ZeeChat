@@ -1470,3 +1470,69 @@ body {
     touch-action: pan-y;
   }
 }
+
+
+/* ZeeChat Reels refresh: deliberate TikTok-inspired hierarchy, safe zones, and expressive motion */
+.reels-view.immersive-reels{background:#050507!important;color:#fff!important}
+@media(min-width:601px){
+  .reels-view.immersive-reels{min-height:calc(100dvh - 32px)!important;padding:12px 18px 22px!important;overflow:visible!important}
+  .reels-view.immersive-reels .reel-layout{display:grid!important;grid-template-columns:minmax(320px,min(43vw,490px)) 76px!important;gap:22px!important;align-items:center!important;justify-content:center!important;min-height:calc(100dvh - 80px)!important;max-width:1050px!important;margin:0 auto!important;overflow:visible!important}
+  .reels-view.immersive-reels .reel-player{position:relative!important;inset:auto!important;width:100%!important;height:min(84dvh,850px)!important;min-height:560px!important;max-height:850px!important;aspect-ratio:9/16!important;border:1px solid #ffffff1c!important;border-radius:24px!important;overflow:hidden!important;box-shadow:0 28px 90px #0009,0 0 0 1px #ffffff08!important}
+  .reels-view.immersive-reels .reel-player>.live-reel-video{object-fit:cover!important;object-position:center!important;border-radius:24px!important;background:#050507!important}
+  .reels-view.immersive-reels .immersive-reel-header{padding:calc(17px + env(safe-area-inset-top)) 18px 34px!important}
+  .reels-view.immersive-reels .reel-caption{left:20px!important;right:16px!important;bottom:18px!important;padding:64px 0 16px!important}
+  .reels-view.immersive-reels .reel-caption p{-webkit-line-clamp:4!important;font-size:14px!important;line-height:1.5!important}
+  .reels-view.immersive-reels .reel-caption strong{font-size:12px!important}
+  .reels-view.immersive-reels .sound-line{font-size:12px!important}
+  .reels-view.immersive-reels .reel-actions{position:relative!important;inset:auto!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:18px!important;width:76px!important;padding:16px 0!important}
+  .reels-view.immersive-reels .reel-actions>button{min-height:58px!important;gap:7px!important}
+  .reels-view.immersive-reels .action-circle{width:50px!important;height:50px!important;background:#17131dc9!important;border:1px solid #ffffff1b!important;box-shadow:0 8px 24px #0003!important}
+  .reels-view.immersive-reels .reel-actions>button b,.reels-view.immersive-reels .reel-view-count b{font-size:11px!important}
+  .reels-view.immersive-reels .reel-creator-action{margin-bottom:5px!important}
+}
+.reels-view.immersive-reels .sound-button{position:absolute!important;z-index:7!important;top:88px!important;right:16px!important;width:48px!important;height:48px!important;display:grid!important;place-items:center!important;padding:0!important;border:1px solid #ffffff38!important;border-radius:50%!important;background:#0a0a10b8!important;backdrop-filter:blur(14px)!important;box-shadow:0 8px 24px #0005!important}
+.sound-vinyl{position:relative;display:grid;place-items:center;width:39px;height:39px;border:1px solid #ffffff35;border-radius:50%;background:repeating-radial-gradient(circle at center,#16151d 0 3px,#282632 3.5px 4px,#111018 4.5px 6px);box-shadow:inset 0 0 0 2px #050507,0 0 15px #a64dff33}
+.sound-vinyl:before{content:"";position:absolute;inset:5px;border:1px solid #ffffff18;border-radius:50%}
+.sound-vinyl-label{position:relative;display:grid;place-items:center;width:17px;height:17px;border:2px solid #fff;border-radius:50%;background:linear-gradient(135deg,#ff4f9a,#8d5bff);color:#fff;font-size:10px;line-height:1}
+.sound-vinyl-state{position:absolute;right:-2px;bottom:-2px;display:grid;place-items:center;width:14px;height:14px;border:1px solid #111018;border-radius:50%;background:#f6f3ff;color:#16111d;font-size:9px;font-weight:900;line-height:1}
+.sound-disc-playing .sound-vinyl{animation:zeechat-vinyl-spin 2.8s linear infinite}
+.sound-disc-muted .sound-vinyl{animation-play-state:paused;filter:saturate(.65)}
+@keyframes zeechat-vinyl-spin{to{transform:rotate(360deg)}}
+.reels-view.immersive-reels .sound-line-button{display:flex!important;align-items:center!important;gap:8px!important;width:max-content!important;max-width:100%!important;padding:7px 0!important;overflow:hidden!important}
+.reel-sound-disc{display:inline-grid;place-items:center;flex:0 0 27px;width:27px;height:27px;border:1px solid #ffffff33;border-radius:50%;background:repeating-radial-gradient(circle at center,#25232c 0 2px,#100f15 2.5px 4px);box-shadow:0 0 12px #b54dff2a}
+.reel-sound-disc>span{display:grid;place-items:center;width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,#ff4f9a,#8d5bff);color:white;font-size:9px;line-height:1}
+.reel-sound-disc.spinning{animation:zeechat-vinyl-spin 3.2s linear infinite}
+.reel-sound-disc.paused{animation-play-state:paused}
+.reel-sound-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:11px!important;font-weight:650}
+.reel-sound-cta{flex:0 0 auto;color:#ff91c4!important;font-size:10px!important;font-weight:750}
+.reels-view.immersive-reels .reel-actions .reel-reaction-button .action-circle{transition:transform .18s cubic-bezier(.2,.8,.2,1),background .18s ease,box-shadow .18s ease}
+.reels-view.immersive-reels .reel-actions .reel-reaction-button:active .action-circle{transform:scale(.82)}
+.reels-view.immersive-reels .reel-actions .reel-reaction-button.liked .action-circle{background:linear-gradient(145deg,#70213f,#31172c)!important;box-shadow:0 0 24px #ff397c36!important}
+.reels-view.immersive-reels .reel-actions .reel-reaction-button.liked .action-circle svg{animation:zeechat-heart-beat .48s ease-out}
+@keyframes zeechat-heart-beat{0%{transform:scale(.5)}45%{transform:scale(1.35)}75%{transform:scale(.9)}100%{transform:scale(1)}}
+.reels-view.immersive-reels .reel-actions>button:not(.reel-reaction-button):active .action-circle{transform:scale(.9)}
+.reels-view.immersive-reels .rail-follow-button{box-shadow:0 0 0 3px #ff4f9a26!important}
+.reel-like-burst{filter:drop-shadow(0 7px 26px #ff2f7c65)!important}
+@keyframes reel-like-burst{0%{opacity:0;transform:translate(-50%,-50%) scale(.25) rotate(-18deg)}25%{opacity:1;transform:translate(-50%,-50%) scale(1.16) rotate(7deg)}48%{transform:translate(-50%,-50%) scale(.94) rotate(-3deg)}72%{opacity:1;transform:translate(-50%,-50%) scale(1.02)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.35) translateY(-18px)}}
+@media(max-width:600px){
+  .reels-view.immersive-reels .sound-button{top:calc(max(18px,env(safe-area-inset-top)) + 83px)!important;right:12px!important;width:44px!important;height:44px!important}
+  .sound-vinyl{width:36px;height:36px}
+  .reels-view.immersive-reels .reel-caption{right:70px!important;max-height:38%!important}
+  .reels-view.immersive-reels .reel-caption p{-webkit-line-clamp:3!important;font-size:13px!important;line-height:1.45!important}
+  .reels-view.immersive-reels .reel-caption strong{font-size:11px!important}
+  .reels-view.immersive-reels .reel-actions{right:6px!important;bottom:calc(12px + env(safe-area-inset-bottom))!important;gap:10px!important;width:48px!important}
+  .reels-view.immersive-reels .action-circle{width:38px!important;height:38px!important}
+  .reels-view.immersive-reels .reel-actions>button{min-height:42px!important}
+  .reels-view.immersive-reels .reel-actions>button b{font-size:10px!important}
+  .reels-view.immersive-reels .reel-sound-cta{max-width:86px;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:360px){
+  .reels-view.immersive-reels .reel-caption{right:64px!important}
+  .reels-view.immersive-reels .reel-actions{width:44px!important;gap:7px!important}
+  .reels-view.immersive-reels .action-circle{width:34px!important;height:34px!important}
+  .reels-view.immersive-reels .sound-button{right:9px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .sound-disc-playing .sound-vinyl,.reel-sound-disc.spinning{animation:none!important}
+  .reels-view.immersive-reels .reel-actions .reel-reaction-button.liked .action-circle svg{animation:none!important}
+}
