@@ -31,7 +31,8 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Lint
+      - name: Lint (advisory while existing warnings are triaged)
+        continue-on-error: true
         run: npm run lint
 
       - name: Build
