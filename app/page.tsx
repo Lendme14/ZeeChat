@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, Bell, Bookmark, CalendarClock, Check, CheckCheck, Compass, Eye, Film, Gamepad2, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Bell, Bookmark, CalendarClock, Check, CheckCheck, Compass, Eye, Film, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, Volume2, VolumeX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 function formatVideoTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const total = Math.floor(seconds); return Math.floor(total / 60) + ":" + String(total % 60).padStart(2, "0"); }
 
-type View = "Home" | "Reels" | "Discover" | "Parties" | "Play" | "Chats" | "Profile";
+type View = "Home" | "Reels" | "Discover" | "Parties" | "Chats" | "Profile";
 type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; thumbnail_url?: string | null; sound_id?: string | null; is_reel?: boolean; };
 type ZeeSound = { id: string; creator_id: string; title: string; audio_url: string; source_post_id?: string | null; created_at: string; };
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
@@ -22,7 +22,7 @@ const sampleReels = [
   { user: "tomi.laughs", caption: "Tag the friend who would absolutely do this 😭", tags: "#relatable #friendship", sound: "comedy loop · ZeeSounds", image: "photo-1527529482837-4698179dc6ce", likes: "31.6K", comments: "2,087", initial: "T" },
 ];
 const nav: { name: View; icon: typeof Film }[] = [
-  { name: "Home", icon: Film }, { name: "Reels", icon: Video }, { name: "Discover", icon: Compass }, { name: "Parties", icon: Users }, { name: "Play", icon: Gamepad2 }, { name: "Chats", icon: MessageCircle }, { name: "Profile", icon: UserRound },
+  { name: "Home", icon: Film }, { name: "Reels", icon: Video }, { name: "Discover", icon: Compass }, { name: "Parties", icon: Users }, { name: "Chats", icon: MessageCircle }, { name: "Profile", icon: UserRound },
 ];
 
 
@@ -53,45 +53,6 @@ function ContentActionMenu({ label, onDelete, disabled = false }: { label: strin
 }
 
 
-type CaptionBattleEntry = { id: string; author_id: string; challenge_date: string; caption: string; vote_count: number; created_at: string; displayName: string; username: string; avatarUrl?: string | null };
-type WeeklyCaptionLeader = { authorId: string; displayName: string; username: string; avatarUrl?: string | null; votes: number; entries: number };
-const DAILY_CAPTION_PROMPTS = [
-  "Your friend said “I’m five minutes away” 45 minutes ago. Caption this.",
-  "When payday lands and every bill was waiting in line. What’s the caption?",
-  "POV: you opened the fridge for the fourth time hoping new food appeared.",
-  "When someone says “we need to talk” and then disappears for three hours.",
-  "That one friend who says “I’m not hungry” then eats half your food.",
-  "You said “one more episode” and suddenly the birds are singing.",
-  "When the group chat says “quick meeting” and sends a 47-minute voice note.",
-  "The face you make when mobile data finishes at the worst possible moment.",
-  "When you dress up just to find out the event was postponed.",
-  "You finally sit down to rest and everyone suddenly needs something.",
-  "When you hear “there’s food at home” but you were already outside.",
-  "That moment your phone falls on your face at 2 a.m."
-];
-function getDailyCaptionPrompt() {
-  const seed = Number(new Date().toISOString().slice(0, 10).replace(/-/g, ""));
-  return DAILY_CAPTION_PROMPTS[seed % DAILY_CAPTION_PROMPTS.length];
-}
-type TriviaQuestion = { question: string; options: string[]; answer: number; fact: string };
-const TRIVIA_QUESTIONS: TriviaQuestion[] = [
-  { question: "Which planet is known as the Red Planet?", options: ["Mars", "Venus", "Jupiter", "Mercury"], answer: 0, fact: "Iron minerals on Mars give its surface that rusty red look." },
-  { question: "How many sides does a hexagon have?", options: ["Five", "Six", "Seven", "Eight"], answer: 1, fact: "The prefix “hex” means six." },
-  { question: "Which is the largest ocean on Earth?", options: ["Atlantic", "Indian", "Arctic", "Pacific"], answer: 3, fact: "The Pacific covers more area than all of Earth's land combined." },
-  { question: "What does CPU stand for?", options: ["Computer Power Utility", "Central Processing Unit", "Core Program Upload", "Central Performance User"], answer: 1, fact: "The CPU executes instructions and coordinates work inside a computer." },
-  { question: "What is the largest living mammal?", options: ["African elephant", "Giraffe", "Blue whale", "Orca"], answer: 2, fact: "Blue whales can grow longer than a basketball court." },
-  { question: "How many minutes are in 2.5 hours?", options: ["120", "135", "150", "180"], answer: 2, fact: "2.5 × 60 = 150 minutes." },
-  { question: "Which gas do plants absorb from the air?", options: ["Oxygen", "Carbon dioxide", "Helium", "Hydrogen"], answer: 1, fact: "Plants use carbon dioxide, water and sunlight during photosynthesis." },
-  { question: "Who painted the Mona Lisa?", options: ["Vincent van Gogh", "Pablo Picasso", "Claude Monet", "Leonardo da Vinci"], answer: 3, fact: "Leonardo da Vinci painted the portrait during the Renaissance." },
-  { question: "Which animal is the fastest land runner?", options: ["Lion", "Cheetah", "Horse", "Ostrich"], answer: 1, fact: "A cheetah can accelerate to around 100 km/h in short bursts." },
-  { question: "What is 9 × 7?", options: ["56", "63", "72", "69"], answer: 1, fact: "A quick trick: 10 × 7 is 70, minus 7 gives 63." },
-  { question: "Which instrument typically has keys, pedals and strings?", options: ["Flute", "Drum kit", "Piano", "Trumpet"], answer: 2, fact: "Pressing a piano key makes a hammer strike a string." },
-  { question: "What is the smallest prime number?", options: ["0", "1", "2", "3"], answer: 2, fact: "Two is the only even prime number." },
-  { question: "Which continent is Egypt mainly located in?", options: ["Asia", "Africa", "Europe", "South America"], answer: 1, fact: "Most of Egypt is in northeast Africa; the Sinai Peninsula lies in Asia." },
-  { question: "Which language is mainly used to style web pages?", options: ["CSS", "SQL", "Bash", "Python"], answer: 0, fact: "CSS controls the visual presentation of HTML pages." },
-  { question: "Which Nigerian city is nicknamed the Centre of Excellence?", options: ["Abuja", "Kano", "Lagos", "Enugu"], answer: 2, fact: "Lagos State is widely known by the slogan “Centre of Excellence.”" },
-];
-
 const DAILY_COMMUNITY_PROMPTS = [
   "What’s one small win you’re celebrating today?",
   "Drop a song that instantly lifts your mood.",
@@ -114,33 +75,9 @@ function getDailyCommunityPrompt() {
   return DAILY_COMMUNITY_PROMPTS[seed % DAILY_COMMUNITY_PROMPTS.length];
 }
 
-type TriviaStats = { bestScore: number; streak: number; lastPlayed: string };
 function localDateKey(date = new Date()) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function getDailyTriviaQuestions() {
-  const key = localDateKey();
-  const seed = Number(key.replace(/-/g, ""));
-  const start = seed % TRIVIA_QUESTIONS.length;
-  return Array.from({ length: 5 }, (_, i) => TRIVIA_QUESTIONS[(start + i) % TRIVIA_QUESTIONS.length]);
-}
-
 export default function HomePage() {
   const [view, setView] = useState<View>("Home");
-  const [triviaQuestions, setTriviaQuestions] = useState<TriviaQuestion[]>([]);
-  const [triviaIndex, setTriviaIndex] = useState(0);
-  const [triviaAnswer, setTriviaAnswer] = useState<number | null>(null);
-  const [triviaScore, setTriviaScore] = useState(0);
-  const [triviaStarted, setTriviaStarted] = useState(false);
-  const [triviaFinished, setTriviaFinished] = useState(false);
-  const [triviaStats, setTriviaStats] = useState<TriviaStats>({ bestScore: 0, streak: 0, lastPlayed: "" });
-  const [captionBattleEntries, setCaptionBattleEntries] = useState<CaptionBattleEntry[]>([]);
-  const [captionBattleDraft, setCaptionBattleDraft] = useState("");
-  const [captionBattleLoading, setCaptionBattleLoading] = useState(false);
-  const [captionBattleSubmitting, setCaptionBattleSubmitting] = useState(false);
-  const [captionBattleSort, setCaptionBattleSort] = useState<"top" | "new">("top");
-  const [captionBattleVotedIds, setCaptionBattleVotedIds] = useState<string[]>([]);
-  const [captionBattleBusyIds, setCaptionBattleBusyIds] = useState<string[]>([]);
-  const [weeklyCaptionLeaders, setWeeklyCaptionLeaders] = useState<WeeklyCaptionLeader[]>([]);
-  const [weeklyCaptionLoading, setWeeklyCaptionLoading] = useState(false);
 
 
   const [index, setIndex] = useState(0);
@@ -276,50 +213,6 @@ export default function HomePage() {
     return () => { active = false; };
   }, [userId]);
 
-  useEffect(() => {
-    let active = true;
-    const key = `zeechat-trivia-stats-${userId ?? "guest"}`;
-    let localStats: TriviaStats = { bestScore: 0, streak: 0, lastPlayed: "" };
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<TriviaStats>;
-        localStats = { bestScore: Number(parsed.bestScore) || 0, streak: Number(parsed.streak) || 0, lastPlayed: typeof parsed.lastPlayed === "string" ? parsed.lastPlayed : "" };
-      }
-    } catch { /* Keep clean defaults if local storage is unavailable. */ }
-    if (active) setTriviaStats(localStats);
-    if (!userId) return () => { active = false; };
-    void (async () => {
-      const { data, error } = await createClient().from("zeechat_trivia_stats")
-        .select("best_score,streak,last_played")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (!active || error || !data) return;
-      const remoteStats: TriviaStats = {
-        bestScore: Number(data.best_score) || 0,
-        streak: Number(data.streak) || 0,
-        lastPlayed: typeof data.last_played === "string" ? data.last_played : "",
-      };
-      const localIsNewer = localStats.lastPlayed > remoteStats.lastPlayed;
-      const merged: TriviaStats = {
-        bestScore: Math.max(localStats.bestScore, remoteStats.bestScore),
-        streak: localIsNewer ? localStats.streak : localStats.lastPlayed === remoteStats.lastPlayed ? Math.max(localStats.streak, remoteStats.streak) : remoteStats.streak,
-        lastPlayed: localIsNewer ? localStats.lastPlayed : remoteStats.lastPlayed,
-      };
-      setTriviaStats(merged);
-      try { localStorage.setItem(key, JSON.stringify(merged)); } catch { /* Database remains the durable copy. */ }
-      if (localIsNewer || merged.bestScore > remoteStats.bestScore) {
-        await createClient().from("zeechat_trivia_stats").upsert({
-          user_id: userId, best_score: merged.bestScore, streak: merged.streak,
-          last_played: merged.lastPlayed || null, updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-      }
-    })();
-    return () => { active = false; };
-  }, [userId]);
-
-  const captionBattleHasEntered = Boolean(userId && captionBattleEntries.some(entry => entry.author_id === userId));
-  const sortedCaptionBattleEntries = [...captionBattleEntries].sort((a, b) => captionBattleSort === "top" ? b.vote_count - a.vote_count || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at));
   const unreadConversationCount = inboxConversations.filter(item => item.unreadCount > 0).length;
   const filteredInboxConversations = inboxConversations.filter(item => (inboxFilter !== "unread" || item.unreadCount > 0) && `${item.displayName} ${item.username} ${item.lastMessage}`.toLowerCase().includes(inboxSearch.trim().toLowerCase()));
   const feedReels = reelFeedMode === "saved" ? liveReels.filter(post => savedReelIds.includes(post.id)).sort((a, b) => savedReelIds.indexOf(b.id) - savedReelIds.indexOf(a.id)) : reelFeedMode === "following" ? liveReels.filter(post => followedCreatorIds.has(postAuthors[post.author_id]?.username || "")) : reelFeedMode === "fresh" ? [...liveReels].sort((a, b) => b.created_at.localeCompare(a.created_at)) : [...liveReels].sort((a, b) => { const score = (post: Post) => { const ageHours = Math.max(0, (Date.now() - new Date(post.created_at).getTime()) / 3600000); const engagement = (postLikeCounts[post.id] ?? 0) * 3 + (commentCounts[post.id] ?? 0) * 5 + Math.log1p(postViewCounts[post.id] ?? 0) * 2; return engagement + 12 * Math.exp(-ageHours / 72); }; return score(b) - score(a); });
@@ -702,9 +595,7 @@ export default function HomePage() {
       if (!error) setNotifications(current => current.map(row => row.id === item.id ? { ...row, read_at: now } : row));
     }
     setNotificationsOpen(false);
-    if (item.kind === "caption_vote") {
-      setView("Play");
-    } else if (item.kind === "message") {
+    if (item.kind === "message") {
       setActiveChat(false);
       setActiveConversationId(null);
       activeConversationRef.current = null;
@@ -1307,227 +1198,6 @@ export default function HomePage() {
   }
 
 
-  function startTrivia() {
-    setTriviaQuestions(getDailyTriviaQuestions());
-    setTriviaIndex(0);
-    setTriviaAnswer(null);
-    setTriviaScore(0);
-    setTriviaFinished(false);
-    setTriviaStarted(true);
-  }
-
-  function chooseTriviaAnswer(optionIndex: number) {
-    const question = triviaQuestions[triviaIndex];
-    if (!question || triviaAnswer !== null) return;
-    setTriviaAnswer(optionIndex);
-    if (optionIndex === question.answer) setTriviaScore(score => score + 1);
-  }
-
-  function advanceTrivia() {
-    if (triviaIndex < triviaQuestions.length - 1) {
-      setTriviaIndex(index => index + 1);
-      setTriviaAnswer(null);
-      return;
-    }
-    const today = localDateKey();
-    const yesterday = localDateKey(new Date(Date.now() - 86400000));
-    const storageKey = `zeechat-trivia-stats-${userId ?? "guest"}`;
-    const nextStats: TriviaStats = {
-      bestScore: Math.max(triviaStats.bestScore, triviaScore),
-      streak: triviaStats.lastPlayed === today ? triviaStats.streak : triviaStats.lastPlayed === yesterday ? triviaStats.streak + 1 : 1,
-      lastPlayed: today,
-    };
-    setTriviaStats(nextStats);
-    try { localStorage.setItem(storageKey, JSON.stringify(nextStats)); } catch { /* Keep the result visible if storage is unavailable. */ }
-    if (userId) {
-      void createClient().from("zeechat_trivia_stats").upsert({
-        user_id: userId,
-        best_score: nextStats.bestScore,
-        streak: nextStats.streak,
-        last_played: nextStats.lastPlayed,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" }).then(({ error }) => {
-        if (error) setNotice("Trivia saved on this device, but cloud sync failed. Your next result will retry.");
-      });
-    }
-    setTriviaStarted(false);
-    setTriviaFinished(true);
-  }
-
-  async function shareTriviaScore() {
-    const message = `I scored ${triviaScore}/5 in today’s ZeeChat Quickfire Trivia! Can you beat me? ${window.location.origin}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "ZeeChat Quickfire Trivia", text: message });
-      else {
-        await navigator.clipboard.writeText(message);
-        setNotice("Score copied — send it to a friend!");
-      }
-    } catch { /* Share sheet dismissed or clipboard unavailable. */ }
-  }
-
-
-  const loadCaptionBattle = useCallback(async () => {
-    if (!userId) {
-      setCaptionBattleEntries([]);
-      setCaptionBattleVotedIds([]);
-      setCaptionBattleLoading(false);
-      return;
-    }
-    setCaptionBattleLoading(true);
-    try {
-      const supabase = createClient();
-      const today = new Date().toISOString().slice(0, 10);
-      const { data, error } = await supabase.from("zeechat_caption_battles")
-        .select("id,author_id,challenge_date,caption,vote_count,created_at")
-        .eq("challenge_date", today)
-        .order("vote_count", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      const rows = (data ?? []) as Omit<CaptionBattleEntry, "displayName" | "username" | "avatarUrl">[];
-      const authorIds = [...new Set(rows.map(entry => entry.author_id))];
-      const authors: Record<string, { username: string; display_name: string; avatar_url?: string | null }> = {};
-      if (authorIds.length) {
-        const { data: authorRows, error: authorError } = await supabase.from("zeechat_profiles")
-          .select("user_id,username,display_name,avatar_url")
-          .in("user_id", authorIds);
-        if (authorError) throw authorError;
-        for (const author of authorRows ?? []) authors[author.user_id] = author;
-      }
-      const { data: votes, error: votesError } = await supabase.from("zeechat_caption_battle_votes")
-        .select("entry_id").eq("voter_id", userId);
-      if (votesError) throw votesError;
-      setCaptionBattleEntries(rows.map(entry => ({
-        ...entry,
-        displayName: authors[entry.author_id]?.display_name || (entry.author_id === userId ? profile?.display_name || "You" : "ZeeChat member"),
-        username: authors[entry.author_id]?.username || (entry.author_id === userId ? profile?.username || "you" : "member"),
-        avatarUrl: authors[entry.author_id]?.avatar_url || null,
-      })));
-      setCaptionBattleVotedIds((votes ?? []).map(vote => vote.entry_id));
-    } catch (error) {
-      setNotice(error instanceof Error ? "Caption Battle couldn’t load: " + error.message : "Caption Battle couldn’t load. Please try again.");
-    } finally {
-      setCaptionBattleLoading(false);
-    }
-  }, [userId, profile]);
-
-  const loadWeeklyCaptionLeaderboard = useCallback(async () => {
-    if (!userId) {
-      setWeeklyCaptionLeaders([]);
-      setWeeklyCaptionLoading(false);
-      return;
-    }
-    setWeeklyCaptionLoading(true);
-    try {
-      const supabase = createClient();
-      const now = new Date();
-      const utcDay = now.getUTCDay();
-      now.setUTCDate(now.getUTCDate() - (utcDay === 0 ? 6 : utcDay - 1));
-      const weekStart = now.toISOString().slice(0, 10);
-      const today = new Date().toISOString().slice(0, 10);
-      const { data, error } = await supabase.from("zeechat_caption_battles")
-        .select("id,author_id,vote_count,challenge_date")
-        .gte("challenge_date", weekStart)
-        .lte("challenge_date", today)
-        .order("vote_count", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      const totals = new Map<string, { votes: number; entries: number }>();
-      for (const entry of data ?? []) {
-        const current = totals.get(entry.author_id) ?? { votes: 0, entries: 0 };
-        current.votes += entry.vote_count ?? 0;
-        current.entries += 1;
-        totals.set(entry.author_id, current);
-      }
-      const authorIds = [...totals.keys()];
-      if (!authorIds.length) {
-        setWeeklyCaptionLeaders([]);
-        return;
-      }
-      const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles")
-        .select("user_id,username,display_name,avatar_url")
-        .in("user_id", authorIds);
-      if (profileError) throw profileError;
-      const profileMap = new Map((profiles ?? []).map(author => [author.user_id, author]));
-      const leaders = authorIds.map(authorId => {
-        const author = profileMap.get(authorId);
-        const total = totals.get(authorId)!;
-        return {
-          authorId,
-          displayName: author?.display_name || (authorId === userId ? profile?.display_name || "You" : "ZeeChat member"),
-          username: author?.username || (authorId === userId ? profile?.username || "you" : "member"),
-          avatarUrl: author?.avatar_url || null,
-          votes: total.votes,
-          entries: total.entries,
-        };
-      }).sort((a, b) => b.votes - a.votes || b.entries - a.entries || a.username.localeCompare(b.username)).slice(0, 10);
-      setWeeklyCaptionLeaders(leaders);
-    } catch (error) {
-      setWeeklyCaptionLeaders([]);
-      setNotice(error instanceof Error ? "Weekly leaderboard couldn’t load: " + error.message : "Weekly leaderboard couldn’t load. Please try again.");
-    } finally {
-      setWeeklyCaptionLoading(false);
-    }
-  }, [userId, profile]);
-
-  useEffect(() => {
-    if (view === "Play") {
-      void loadCaptionBattle();
-      void loadWeeklyCaptionLeaderboard();
-    }
-  }, [view, loadCaptionBattle, loadWeeklyCaptionLeaderboard]);
-
-  async function submitCaptionBattleEntry(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!userId) { setNotice("Sign in to enter today’s Caption Battle."); return; }
-    const text = captionBattleDraft.trim();
-    if (text.length < 3 || text.length > 240) { setNotice("Your caption must be between 3 and 240 characters."); return; }
-    setCaptionBattleSubmitting(true);
-    try {
-      const supabase = createClient();
-      const today = new Date().toISOString().slice(0, 10);
-      const { error } = await supabase.from("zeechat_caption_battles").insert({
-        author_id: userId, challenge_date: today, caption: text,
-      });
-      if (error) {
-        if (error.code === "23505") { setNotice("You’ve already entered today. Vote for someone else’s caption!"); await loadCaptionBattle(); return; }
-        throw error;
-      }
-      setCaptionBattleDraft("");
-      setNotice("You’re in! Now vote for your favorite caption.");
-      await loadCaptionBattle();
-    } catch (error) {
-      setNotice(error instanceof Error ? "Couldn’t submit your caption: " + error.message : "Couldn’t submit your caption. Please try again.");
-    } finally {
-      setCaptionBattleSubmitting(false);
-    }
-  }
-
-  async function voteForCaptionBattleEntry(entry: CaptionBattleEntry) {
-    if (!userId) { setNotice("Sign in to vote in Caption Battle."); return; }
-    if (entry.author_id === userId) { setNotice("You can’t vote for your own caption."); return; }
-    if (captionBattleVotedIds.includes(entry.id) || captionBattleBusyIds.includes(entry.id)) return;
-    setCaptionBattleBusyIds(current => [...current, entry.id]);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.from("zeechat_caption_battle_votes").insert({ entry_id: entry.id, voter_id: userId });
-      if (error) {
-        if (error.code === "23505") {
-          setCaptionBattleVotedIds(current => current.includes(entry.id) ? current : [...current, entry.id]);
-          setNotice("You’ve already voted for this caption.");
-          return;
-        }
-        throw error;
-      }
-      setCaptionBattleVotedIds(current => [...current, entry.id]);
-      setCaptionBattleEntries(current => current.map(item => item.id === entry.id ? { ...item, vote_count: item.vote_count + 1 } : item));
-    } catch (error) {
-      setNotice(error instanceof Error ? "Couldn’t save your vote: " + error.message : "Couldn’t save your vote. Please try again.");
-    } finally {
-      setCaptionBattleBusyIds(current => current.filter(id => id !== entry.id));
-    }
-  }
-
   async function shareDailyPrompt() {
     const message = `Today’s ZeeChat community prompt: “${getDailyCommunityPrompt()}” — join the conversation at ${window.location.origin}`;
     try {
@@ -1584,149 +1254,6 @@ export default function HomePage() {
         <div className="upcoming-party-list"><article><div className="upcoming-date"><b>08</b><span>PM</span></div><div className="upcoming-copy"><h3>Creators Unplugged</h3><p><CalendarClock size={13}/> Tonight · Host Q&amp;A and open mic</p></div><button onClick={() => setNotice("Reminders will be available when party scheduling is connected.")}>Remind me <span>＋</span></button></article><article><div className="upcoming-date"><b>09</b><span>PM</span></div><div className="upcoming-copy"><h3>Chill &amp; Chat 🌙</h3><p><CalendarClock size={13}/> Tomorrow · Meet new people</p></div><button onClick={() => setNotice("Reminders will be available when party scheduling is connected.")}>Remind me <span>＋</span></button></article></div>
         <div className="party-bottom-cta"><div><span className="eyebrow">YOUR ROOM. YOUR RULES.</span><h2>Host the next <em>great night.</em></h2><p>Create a space for your people to hang out.</p></div><button className="create-button" onClick={() => setPartyCreateOpen(true)}><Plus size={18}/> Create party</button></div>
       </section>}
-      {view === "Play" && (
-        <section className="content-view play-view">
-          <div className="play-heading">
-            <span className="eyebrow">YOUR DAILY DOSE OF FUN</span>
-            <h1>Let&apos;s <em>play.</em></h1>
-            <p>Quick challenges, tiny wins, and something fun to share with your people.</p>
-          </div>
-          <div className="daily-challenge-banner">
-            <div className="daily-challenge-icon">⚡</div>
-            <div className="daily-challenge-copy">
-              <span className="eyebrow">TODAY&apos;S CHALLENGE</span>
-              <h2>Quickfire Trivia</h2>
-              <p>Five questions. One daily run. How many can you get right?</p>
-            </div>
-            <div className="daily-challenge-meta">
-              <span>🧠 5 rounds</span>
-              <span>🏆 {triviaStats.bestScore}/5 best</span>
-              <span>🔥 {triviaStats.streak} day streak</span>
-            </div>
-          </div>
-          {!triviaStarted && !triviaFinished && (
-            <div className="trivia-start-panel">
-              <div className="trivia-orbit">🧠</div>
-              <h2>Ready to flex your brain?</h2>
-              <p>Your daily set refreshes each day. Play for fun, beat your personal best, then share your score with friends.</p>
-              <div className="trivia-rules">
-                <span><Check size={16}/> 5 multiple-choice questions</span>
-                <span><Check size={16}/> Instant answer explanations</span>
-                <span><Check size={16}/> Personal best and streak sync across devices when signed in</span>
-              </div>
-              <button className="trivia-primary-button" onClick={startTrivia}>Start today&apos;s challenge <ArrowLeft size={17} className="trivia-start-arrow"/></button>
-            </div>
-          )}
-          {triviaStarted && !triviaFinished && triviaQuestions[triviaIndex] && (
-            <div className="trivia-game-panel">
-              <div className="trivia-progress-row">
-                <span>QUESTION {triviaIndex + 1} OF {triviaQuestions.length}</span>
-                <span>✨ {triviaScore} {triviaScore === 1 ? "point" : "points"}</span>
-              </div>
-              <div className="trivia-progress-track"><span style={{ width: `${((triviaIndex + (triviaAnswer !== null ? 1 : 0)) / triviaQuestions.length) * 100}%` }}/></div>
-              <h2>{triviaQuestions[triviaIndex].question}</h2>
-              <div className="trivia-options">
-                {triviaQuestions[triviaIndex].options.map((option, optionIndex) => {
-                  let optionClass = "trivia-option";
-                  if (triviaAnswer !== null && optionIndex === triviaQuestions[triviaIndex].answer) optionClass += " is-correct";
-                  else if (triviaAnswer === optionIndex) optionClass += " is-wrong";
-                  else if (triviaAnswer !== null) optionClass += " is-muted";
-                  return (
-                    <button key={option} className={optionClass} disabled={triviaAnswer !== null} onClick={() => chooseTriviaAnswer(optionIndex)}>
-                      {option}
-                      <span>{triviaAnswer !== null && optionIndex === triviaQuestions[triviaIndex].answer ? "✓" : triviaAnswer === optionIndex ? "×" : String.fromCharCode(65 + optionIndex)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {triviaAnswer !== null && (
-                <div className={triviaAnswer === triviaQuestions[triviaIndex].answer ? "trivia-feedback correct-feedback" : "trivia-feedback"}>
-                  <b>{triviaAnswer === triviaQuestions[triviaIndex].answer ? "Correct!" : "Not quite!"}</b>
-                  <p>{triviaQuestions[triviaIndex].fact}</p>
-                  <button className="trivia-primary-button" onClick={advanceTrivia}>
-                    {triviaIndex < triviaQuestions.length - 1 ? "Next question" : "See my result"} <span>→</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          {triviaFinished && (
-            <div className="trivia-result-panel">
-              <div className="trivia-result-emoji">{triviaScore === 5 ? "🏆" : triviaScore >= 3 ? "🎉" : "💪"}</div>
-              <span className="eyebrow">DAILY CHALLENGE COMPLETE</span>
-              <h2>{triviaScore === 5 ? "Perfect run!" : triviaScore >= 3 ? "You showed up!" : "Every round makes you sharper."}</h2>
-              <div className="trivia-score"><strong>{triviaScore}</strong><span>/ 5 correct</span></div>
-              <p>{triviaScore === 5 ? "Five out of five. Go on and let your friends know." : "Your next run is another chance to beat your best."}</p>
-              <div className="trivia-result-stats">
-                <span><small>PERSONAL BEST</small><b>{triviaStats.bestScore}/5</b></span>
-                <span><small>DAY STREAK</small><b>🔥 {triviaStats.streak}</b></span>
-              </div>
-              <div className="trivia-result-actions">
-                <button className="trivia-primary-button" onClick={shareTriviaScore}>Share my score <Users size={17}/></button>
-                <button className="trivia-secondary-button" onClick={() => { setTriviaFinished(false); setTriviaStarted(false); setTriviaAnswer(null); }}>Back to Play</button>
-              </div>
-            </div>
-          )}
-          <section className="weekly-caption-leaderboard" aria-labelledby="weekly-caption-title">
-            <div className="weekly-caption-heading">
-              <div><span className="eyebrow">WEEKLY RANKINGS</span><h2 id="weekly-caption-title">Caption Champions <span>🏆</span></h2><p>Creators ranked by real votes earned in this week’s Caption Battles.</p></div>
-              <span className="weekly-caption-period">MON–SUN · UTC</span>
-            </div>
-            {!userId ? <div className="weekly-caption-empty">Sign in to see this week’s community leaderboard.</div> : weeklyCaptionLoading ? <div className="weekly-caption-empty">Counting this week’s votes…</div> : weeklyCaptionLeaders.length ? <ol className="weekly-caption-list">
-              {weeklyCaptionLeaders.map((leader, rank) => <li key={leader.authorId} className="weekly-caption-row">
-                <span className={"weekly-caption-rank" + (rank < 3 ? " weekly-caption-podium" : "")}>{rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : rank + 1}</span>
-                <span className="weekly-caption-avatar">{leader.avatarUrl ? <img src={leader.avatarUrl} alt="" loading="lazy" /> : (leader.displayName[0] || "Z").toUpperCase()}</span>
-                <span className="weekly-caption-creator"><b>{leader.authorId === userId ? "You" : leader.displayName}</b><small>@{leader.username} · {leader.entries} {leader.entries === 1 ? "entry" : "entries"}</small></span>
-                <span className="weekly-caption-votes"><b>{leader.votes}</b><small>{leader.votes === 1 ? "vote" : "votes"}</small></span>
-              </li>)}
-            </ol> : <div className="weekly-caption-empty"><b>The leaderboard is wide open.</b><p>Enter today’s Caption Battle and start earning votes to claim the top spot.</p></div>}
-            <button type="button" className="weekly-caption-refresh" onClick={() => void loadWeeklyCaptionLeaderboard()} disabled={weeklyCaptionLoading}>Refresh rankings ↻</button>
-          </section>
-          <section className="caption-battle-panel" aria-labelledby="caption-battle-title">
-            <div className="caption-battle-header">
-              <div>
-                <span className="eyebrow">DAILY COMMUNITY BATTLE</span>
-                <h2 id="caption-battle-title">Caption Battle <span>🔥</span></h2>
-                <p>{getDailyCaptionPrompt()}</p>
-              </div>
-              <div className="caption-battle-today"><span>{captionBattleEntries.length}</span><small>captions today</small></div>
-            </div>
-            {!userId ? (
-              <div className="caption-battle-empty"><b>Your people are waiting.</b><p>Sign in to enter the daily battle and vote for the funniest caption.</p></div>
-            ) : (
-              <>
-                {!captionBattleHasEntered ? (
-                  <form className="caption-battle-form" onSubmit={submitCaptionBattleEntry}>
-                    <label htmlFor="caption-battle-draft">Your one-liner</label>
-                    <textarea id="caption-battle-draft" value={captionBattleDraft} onChange={event => setCaptionBattleDraft(event.target.value)} placeholder="Make it funny. Make it memorable…" maxLength={240} rows={3} />
-                    <div className="caption-battle-form-footer"><small>{captionBattleDraft.trim().length}/240 · one entry per day</small><button type="submit" disabled={captionBattleSubmitting || captionBattleDraft.trim().length < 3}>{captionBattleSubmitting ? "Submitting…" : "Enter the battle"} <ArrowLeft size={15} className="caption-battle-submit-arrow"/></button></div>
-                  </form>
-                ) : <div className="caption-battle-entered"><Check size={17}/><span>You’re in today’s battle. Cast a vote for someone else’s caption!</span></div>}
-                <div className="caption-battle-toolbar"><b>Today’s captions</b><div><button type="button" className={captionBattleSort === "top" ? "active" : ""} onClick={() => setCaptionBattleSort("top")}>Top</button><button type="button" className={captionBattleSort === "new" ? "active" : ""} onClick={() => setCaptionBattleSort("new")}>Newest</button></div></div>
-                {captionBattleLoading ? <div className="caption-battle-empty">Loading today’s captions…</div> : sortedCaptionBattleEntries.length === 0 ? <div className="caption-battle-empty"><b>Be the first to make the room laugh.</b><p>Drop the first caption for today’s prompt.</p></div> : (
-                  <div className="caption-battle-list">
-                    {sortedCaptionBattleEntries.map((entry, rank) => {
-                      const ownEntry = entry.author_id === userId;
-                      const voted = captionBattleVotedIds.includes(entry.id);
-                      const voteBusy = captionBattleBusyIds.includes(entry.id);
-                      return <article className="caption-battle-entry" key={entry.id}>
-                        <div className="caption-battle-rank">{captionBattleSort === "top" && entry.vote_count > 0 ? (rank === 0 ? "🏆" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "#" + (rank + 1)) : "💬"}</div>
-                        <div className="caption-battle-entry-copy"><p>{entry.caption}</p><div><b>{ownEntry ? "You" : entry.displayName}</b><span>@{entry.username}</span></div></div>
-                        <button type="button" className={voted ? "caption-battle-vote voted" : "caption-battle-vote"} disabled={ownEntry || voted || voteBusy} onClick={() => void voteForCaptionBattleEntry(entry)} aria-label={ownEntry ? "Your caption" : voted ? "You voted for this caption" : "Vote for this caption"}><Heart size={15} fill={voted ? "currentColor" : "none"}/><span>{entry.vote_count}</span><small>{ownEntry ? "Yours" : voted ? "Voted" : voteBusy ? "Saving…" : "Vote"}</small></button>
-                      </article>;
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-            <div className="caption-battle-footnote"><ShieldCheck size={14}/> One entry per person daily · one vote per caption · no voting for yourself</div>
-          </section>
-          <div className="feature-grid play-coming-soon">
-            <article className="feature-card"><div className="feature-emoji">😂</div><h3>Caption This</h3><p>Turn a photo into the funniest line in the room.</p><button onClick={() => setNotice("Caption battles are next on the ZeeChat Play roadmap.")}>Coming next ↗</button></article>
-            <article className="feature-card"><div className="feature-emoji">🎤</div><h3>Voice Room Roulette</h3><p>Meet people through shared interests and conversation.</p><button onClick={() => setNotice("Voice Room Roulette is planned for a future release.")}>Coming next ↗</button></article>
-          </div>
-        </section>
-      )}
       {view === "Chats" && <section className={activeChat ? "content-view chat-view chat-detail-view" : "content-view chat-view"}>{activeChat ? <><header className="chat-detail-header"><button className="chat-back-button" onClick={() => {setActiveChat(false);setActiveConversationId(null);activeConversationRef.current=null;void loadInbox(userId ?? "");}} aria-label="Back to messages"><ArrowLeft size={20}/></button><button className="chat-contact" onClick={() => { if (selectedCreator?.username) setView("Profile"); else setNotice("This conversation has no linked creator profile."); }}><span className="chat-contact-avatar">{selectedCreator?.avatarUrl && !failedAvatarUrls.includes(selectedCreator.avatarUrl) ? <Image src={selectedCreator.avatarUrl} alt={`${selectedCreator.username} profile photo`} width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(selectedCreator.avatarUrl!) ? current : [...current, selectedCreator.avatarUrl!])}/> : (selectedCreator?.initial ?? "Z")}<i/></span><span><b>{selectedCreator?.username ?? "Conversation"}</b><small><i/> Direct message</small></span></button><button className="chat-more-button" onClick={() => setNotice("Conversation options: View profile, Search chat, Mute, Block and Report will be added with live messaging.")} aria-label="Conversation options"><MoreHorizontal size={22}/></button></header><div className="chat-timeline" aria-label="Conversation messages"><div className="chat-date-divider"><span>Today</span></div>{liveMessages.map(message=><div className={"chat-message-row "+(message.sender_id===userId ? "mine" : "theirs")} key={message.id}><div className="chat-message-content"><div className="chat-bubble">{message.body}</div><div className="chat-message-meta"><time>{new Date(message.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>{message.sender_id===userId && <Check size={13}/>}</div></div></div>)}{!liveMessages.length && <p className="chat-first-message">You’re connected. Send the first message.</p>}</div><form className="chat-composer" onSubmit={event => {event.preventDefault(); void sendLiveMessage();}}><button type="button" className="chat-attach-button" aria-label="Attachment options" onClick={() => setNotice("Photo, video and file attachments will be available when chat storage is connected.")}><Paperclip size={20}/></button><textarea rows={1} aria-label="Write a message" placeholder="Message ZeeChat…" value={chatDraft} maxLength={4000} onChange={event=>setChatDraft(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit();}}}/><button type="button" className="chat-emoji-button" aria-label="Emoji" onClick={()=>setChatDraft(draft=>draft+"😊")}><Smile size={19}/></button><button type="submit" className="chat-send-button" disabled={!chatDraft.trim()} aria-label="Send message"><Send size={18}/></button></form></> : <><div className="chat-heading"><div><span className="eyebrow">YOUR PEOPLE, YOUR SPACE</span><h1>Messages</h1><p>Keep good conversations going.</p></div><button className="chat-compose" onClick={() => setNotice("New conversations will be available when messaging is connected.")} aria-label="New message"><Plus size={20}/></button></div><div className="chat-search"><Search size={17}/><input aria-label="Search conversations" placeholder="Search conversations…" value={inboxSearch} onChange={event => setInboxSearch(event.target.value)}/>{inboxSearch && <button type="button" aria-label="Clear conversation search" onClick={() => setInboxSearch("")}>×</button>}</div><div className="chat-filter-row"><button type="button" className={inboxFilter === "all" ? "chat-filter-active" : ""} onClick={() => setInboxFilter("all")}>All messages</button><button type="button" className={inboxFilter === "unread" ? "chat-filter-active" : ""} onClick={() => setInboxFilter("unread")}>Unread{unreadConversationCount > 0 ? ` (${unreadConversationCount})` : ""}</button><button type="button" onClick={() => setNotice("Message requests are not available yet.")}>Requests</button></div>{filteredInboxConversations.length ? (<div className="chat-live-inbox">{filteredInboxConversations.map(item=><button type="button" className="chat-demo-thread" key={item.id} onClick={()=>void openExistingConversation(item)} disabled={chatLoading}><span className="chat-contact-avatar">{item.avatarUrl && !failedAvatarUrls.includes(item.avatarUrl) ? <Image src={item.avatarUrl} alt="" width={44} height={44} unoptimized onError={() => setFailedAvatarUrls(current => current.includes(item.avatarUrl!) ? current : [...current, item.avatarUrl!])}/> : (item.displayName[0]||"Z").toUpperCase()}<i/></span><span className="chat-demo-thread-copy"><b>{item.displayName}<small>{item.lastAt ? new Date(item.lastAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</small>{item.unreadCount > 0 && <i className="chat-demo-unread" aria-label={`${item.unreadCount} unread messages`}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</i>}</b><span>{item.lastMessage}</span></span></button>)}</div>) : (inboxConversations.length && (inboxSearch.trim() || inboxFilter === "unread") ? (<div className="chat-inbox-empty"><div className="chat-empty-art"><Search size={25}/></div><h2>{inboxFilter === "unread" && !inboxSearch.trim() ? "You’re all caught up" : inboxFilter === "unread" ? "No matching unread chats" : "No matching conversations"}</h2><p>{inboxFilter === "unread" && !inboxSearch.trim() ? "There are no unread conversations right now." : "Try another name, username, or message keyword."}</p><button onClick={() => {setInboxSearch("");setInboxFilter("all");}}>Show all messages <span>→</span></button></div>) : (<div className="chat-inbox-empty"><div className="chat-empty-art"><MessageCircle size={29}/></div><h2>No conversations yet</h2><p>Visit a creator’s profile and tap Message to start a real conversation.</p><button onClick={() => setView("Discover")}>Discover people <span>→</span></button></div>))}</>}</section>}
       {view === "Profile" && selectedCreator ? <section className="content-view profile-view creator-preview-view">
         <button className="creator-preview-back" onClick={() => {setSelectedCreator(null);setView("Reels");}}><ArrowLeft size={17}/> Back to Reels</button>
