@@ -107,7 +107,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               watchUrlRef.current = signal.url;
               setWatchUrl(signal.url);
               setWatchUrlDraft(signal.url);
-              if (watchVideo.current && !getYouTubeVideoId(signal.url)) { watchVideo.current.pause(); watchVideo.current.src = signal.url; watchVideo.current.load(); }
+              if (watchVideo.current) { watchVideo.current.pause(); if (!getYouTubeVideoId(signal.url)) { watchVideo.current.src = signal.url; watchVideo.current.load(); } }
             } else if (signal.kind === "watch-play" && party.format === "watch") {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
