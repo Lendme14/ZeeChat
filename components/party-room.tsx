@@ -10,10 +10,9 @@ type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave"; from: stri
 export default function PartyRoom({ party, userId, onClose }: { party: PartyRoomInfo; userId: string; onClose: () => void }) {
   const localVideo = useRef<HTMLVideoElement>(null);
   const peers = useRef(new Map<string, RTCPeerConnection>());
-  const remoteVideos = useRef(new Map<string, HTMLVideoElement>());
   const streamRef = useRef<MediaStream | null>(null);
+  const pendingIce = useRef(new Map<string, RTCIceCandidateInit[]>());
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
-  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(party.format !== "video");
@@ -55,6 +54,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
 
   useEffect(() => {
     let cancelled = false;
+    const peerConnections = peers.current;
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
     async function start() {
       try {
@@ -79,17 +79,30 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               if (!pc) { await connectPeer(signal.from, false); pc = peers.current.get(signal.from); }
               if (!pc) return;
               await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+              const queuedCandidates = pendingIce.current.get(signal.from) ?? [];
+              pendingIce.current.delete(signal.from);
+              for (const candidate of queuedCandidates) await pc.addIceCandidate(new RTCIceCandidate(candidate));
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
               send({ kind: "answer", from: userId, to: signal.from, sdp: pc.localDescription ?? undefined });
             } else if (signal.kind === "answer" && signal.sdp) {
               const pc = peers.current.get(signal.from);
-              if (pc && !pc.currentRemoteDescription) await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+              if (pc && !pc.currentRemoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                const queuedCandidates = pendingIce.current.get(signal.from) ?? [];
+                pendingIce.current.delete(signal.from);
+                for (const candidate of queuedCandidates) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+              }
             } else if (signal.kind === "ice" && signal.candidate) {
               const pc = peers.current.get(signal.from);
-              if (pc) await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              if (pc?.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              else {
+                const queued = pendingIce.current.get(signal.from) ?? [];
+                queued.push(signal.candidate);
+                pendingIce.current.set(signal.from, queued);
+              }
             } else if (signal.kind === "leave") {
-              peers.current.get(signal.from)?.close(); peers.current.delete(signal.from);
+              peers.current.get(signal.from)?.close(); peers.current.delete(signal.from); pendingIce.current.delete(signal.from);
               setRemoteStreams(current => { const next = { ...current }; delete next[signal.from]; return next; });
               setParticipants(current => current.filter(id => id !== signal.from));
             }
@@ -103,7 +116,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
           });
         });
         if (cancelled) return;
-        setReady(true); setConnecting(false);
+        setConnecting(false);
         send({ kind: "hello", from: userId });
       } catch (err) {
         if (!cancelled) { setError(err instanceof Error ? err.message : "Could not join this party."); setConnecting(false); }
@@ -113,7 +126,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     return () => {
       cancelled = true;
       send({ kind: "leave", from: userId });
-      peers.current.forEach(pc => pc.close()); peers.current.clear();
+      peerConnections.forEach(pc => pc.close()); peerConnections.clear(); pendingIce.current.clear();
       streamRef.current?.getTracks().forEach(track => track.stop()); streamRef.current = null;
       if (channel) void createClient().removeChannel(channel);
       channelRef.current = null;
