@@ -31,6 +31,7 @@ type ZeeSound = { id: string; creator_id: string; title: string; audio_url: stri
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; is_private?: boolean | null; };
+type IncomingFollowRequest = { id: string; requester_id: string; created_at: string; username: string; display_name: string };
 type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null; reply_to_id?: string | null };
 type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like" | "caption_vote"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
 type ZeeNotificationPreferences = { messages: boolean; follows: boolean; comments: boolean; likes: boolean; community: boolean };
@@ -176,6 +177,9 @@ export default function HomePage() {
   const [bioDraft, setBioDraft] = useState("");
   const [privacyDraft, setPrivacyDraft] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [incomingFollowRequests, setIncomingFollowRequests] = useState<IncomingFollowRequest[]>([]);
+  const [followRequestBusyId, setFollowRequestBusyId] = useState<string | null>(null);
+  const [pendingFollowRequestUserIds, setPendingFollowRequestUserIds] = useState<string[]>([]);
   const [avatarUploadBusy, setAvatarUploadBusy] = useState(false);
   const [coverUploadBusy, setCoverUploadBusy] = useState(false);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
@@ -1134,12 +1138,41 @@ export default function HomePage() {
     }
   }
 
-  function openProfileEditor() {
+  async function openProfileEditor() {
     setDisplayNameDraft(profile?.display_name ?? "");
     setUsernameDraft(profile?.username ?? "");
     setBioDraft(profile?.bio ?? "");
     setPrivacyDraft(profile?.is_private === true);
     setEditProfileOpen(true);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
+      const { data: requests, error } = await supabase.from("zeechat_follow_requests").select("id,requester_id,created_at").eq("target_id", userId).eq("status", "pending").order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = requests ?? [];
+      const requesterIds = [...new Set(rows.map((row: {requester_id:string}) => row.requester_id))];
+      const { data: profiles, error: profilesError } = requesterIds.length ? await supabase.from("zeechat_profiles").select("user_id,username,display_name").in("user_id", requesterIds) : { data: [], error: null };
+      if (profilesError) throw profilesError;
+      const byId = new Map((profiles ?? []).map((item: {user_id:string;username:string;display_name:string}) => [item.user_id, item]));
+      setIncomingFollowRequests(rows.map((row: {id:string;requester_id:string;created_at:string}) => { const requester = byId.get(row.requester_id); return { ...row, username: requester?.username ?? "unknown", display_name: requester?.display_name ?? "ZeeChat user" }; }));
+    } catch (error) { setNotice(error instanceof Error ? "Could not load follow requests: " + error.message : "Could not load follow requests."); }
+  }
+
+  async function respondToFollowRequest(requestId: string, approve: boolean) {
+    if (!userId || followRequestBusyId) return;
+    setFollowRequestBusyId(requestId);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("zeechat_respond_follow_request", { p_request_id: requestId, p_approve: approve });
+      if (error) throw error;
+      const handled = incomingFollowRequests.find(request => request.id === requestId);
+      setIncomingFollowRequests(current => current.filter(request => request.id !== requestId));
+      if (approve && handled) {
+        setFollowCounts(current => ({ ...current, followers: current.followers + 1 }));
+        setNotice("Approved @" + handled.username + " to follow you.");
+      } else setNotice("Follow request declined.");
+    } catch (error) { setNotice(error instanceof Error ? "Could not respond to request: " + error.message : "Could not respond to request."); }
+    finally { setFollowRequestBusyId(null); }
   }
 
   async function saveProfile() {
@@ -1231,7 +1264,7 @@ export default function HomePage() {
     setFollowBusy(true);
     try {
       const supabase = createClient();
-      const { data: creator, error: lookupError } = await supabase.from("zeechat_profiles").select("user_id,username").eq("username", username).maybeSingle();
+      const { data: creator, error: lookupError } = await supabase.from("zeechat_profiles").select("user_id,username,is_private").eq("username", username).maybeSingle();
       if (lookupError) throw lookupError;
       if (!creator) { setNotice("This creator is not linked to a ZeeChat account yet."); return; }
       if (creator.user_id === userId) { setNotice("You cannot follow your own profile."); return; }
@@ -1239,6 +1272,18 @@ export default function HomePage() {
       if (followLookupError) throw followLookupError;
 
       const wasFollowing = Boolean(existing);
+      if (!wasFollowing && creator.is_private) {
+        const { data: existingRequest, error: requestLookupError } = await supabase.from("zeechat_follow_requests").select("id,status").eq("requester_id", userId).eq("target_id", creator.user_id).maybeSingle();
+        if (requestLookupError) throw requestLookupError;
+        if (existingRequest?.status === "pending") { setPendingFollowRequestUserIds(current => current.includes(creator.user_id) ? current : [...current, creator.user_id]); setNotice("Your follow request is still waiting for approval."); return; }
+        if (existingRequest?.status === "approved") { setNotice("You already have an approved follow request. Refresh your profile."); return; }
+        if (existingRequest?.id) { const { error } = await supabase.from("zeechat_follow_requests").delete().eq("id", existingRequest.id).eq("requester_id", userId); if (error) throw error; }
+        const { error: requestError } = await supabase.from("zeechat_follow_requests").insert({ requester_id: userId, target_id: creator.user_id });
+        if (requestError) throw requestError;
+        setPendingFollowRequestUserIds(current => current.includes(creator.user_id) ? current : [...current, creator.user_id]);
+        setNotice("Follow request sent to @" + username + ".");
+        return;
+      }
       const nextFollowing = !wasFollowing;
       // Update the visible state before the write completes so the control feels immediate.
       setCreatorFollowState(state => ({ ...state, [username]: nextFollowing }));
@@ -1767,7 +1812,7 @@ export default function HomePage() {
           {selectedCreatorProfile?.bio && <p>{selectedCreatorProfile.bio}</p>}
           <div className="creator-preview-actions">
             <button className="create-button" disabled={!selectedCreatorProfile || selectedCreatorProfile.user_id === userId} onClick={() => {if(selectedCreatorProfile) void openLiveConversation(selectedCreatorProfile.user_id,selectedCreatorProfile.username,selectedCreator.initial);}}>Message</button>
-            <button className="outline-button" disabled={followBusy || !selectedCreatorProfile || selectedCreatorProfile.user_id === userId} onClick={() => void toggleCreatorFollow(selectedCreatorProfile?.username || selectedCreator.username)}>{followBusy ? "Please wait…" : creatorFollowState[selectedCreatorProfile?.username || selectedCreator.username] ? "Following" : "Follow"}</button>
+            <button className="outline-button" disabled={followBusy || !selectedCreatorProfile || selectedCreatorProfile.user_id === userId} onClick={() => void toggleCreatorFollow(selectedCreatorProfile?.username || selectedCreator.username)}>{followBusy ? "Please wait…" : creatorFollowState[selectedCreatorProfile?.username || selectedCreator.username] ? "Following" : (selectedCreatorProfile?.is_private && pendingFollowRequestUserIds.includes(selectedCreatorProfile.user_id) ? "Requested" : "Follow")}</button>
           </div>
           <div className="profile-stats"><div><b>{selectedCreatorPosts.length}</b><small>Posts</small></div><div><b>{selectedCreatorFollowCounts.followers.toLocaleString()}</b><small>Followers</small></div><div><b>{selectedCreatorFollowCounts.following.toLocaleString()}</b><small>Following</small></div></div>
         </div>
@@ -1778,7 +1823,7 @@ export default function HomePage() {
     {partyProfileBrowsing && activePartyRoom && <button type="button" className="party-return-live" onClick={() => setPartyProfileBrowsing(false)}><Video size={17} /> Return to live room <span>· {activePartyRoom.title}</span></button>}
     {activePartyRoom && userId && <PartyRoom party={activePartyRoom} userId={userId} isBrowsingProfile={partyProfileBrowsing} onOpenProfile={liveProfile => { if (liveProfile.user_id === userId) { setSelectedCreator(null); } else { setSelectedCreator({ username: liveProfile.username, initial: (liveProfile.display_name?.[0] || liveProfile.username?.[0] || "Z").toUpperCase(), avatarUrl: liveProfile.avatar_url }); void loadCreatorFollowState(liveProfile.username); } setView("Profile"); setPartyProfileBrowsing(true); }} onClose={() => { setPartyProfileBrowsing(false); setActivePartyRoom(null); }} /> }
     {partyCreateOpen && <div className="modal-backdrop" onClick={() => !partySubmitting && setPartyCreateOpen(false)}><section className="create-modal party-create-modal" role="dialog" aria-modal="true" aria-labelledby="party-create-title" onClick={event => event.stopPropagation()}><button className="modal-close" onClick={() => !partySubmitting && setPartyCreateOpen(false)} aria-label="Close party setup" disabled={partySubmitting}>×</button><span className="eyebrow">MAKE IT A MOMENT</span><h2 id="party-create-title">Create your <em>party.</em></h2><p>Publish a public community event or keep a private listing for yourself. Choose when it starts and let guests RSVP.</p><form onSubmit={event => void createParty(event)}><label>Party name<input value={partyName} onChange={event => setPartyName(event.target.value)} minLength={3} maxLength={70} placeholder="e.g. Friday Night Hangout" required /></label><label>What’s the vibe?<textarea value={partyDescription} onChange={event => setPartyDescription(event.target.value)} maxLength={240} placeholder="Tell people what to expect…" /></label><div className="party-form-label">Give your party a cover</div><div className="party-thumbnail-upload">{partyThumbnailPreview ? <img src={partyThumbnailPreview} alt="Party thumbnail preview" /> : <div className="party-thumbnail-placeholder" style={{ background: "linear-gradient(135deg, " + (partyStickerOptions.find(item => item.id === partyStickerId)?.colors[0] ?? "#312e81") + ", " + (partyStickerOptions.find(item => item.id === partyStickerId)?.colors[1] ?? "#c026d3") + ")" }}><span>{partyStickerOptions.find(item => item.id === partyStickerId)?.emoji ?? "🌌"}</span><small>YOUR PARTY COVER</small></div>}<label className="party-thumbnail-pick"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event => { const file = event.target.files?.[0] ?? null; if (!file) return; if (file.size > 8 * 1024 * 1024) { setNotice("Choose an image under 8 MB."); event.currentTarget.value = ""; return; } if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) { setNotice("Choose a JPG, PNG, WebP, or GIF image."); event.currentTarget.value = ""; return; } setPartyThumbnailFile(file); setPartyThumbnailPreview(URL.createObjectURL(file)); }} /><span>＋ Upload thumbnail</span></label>{partyThumbnailPreview && <button type="button" className="party-thumbnail-remove" onClick={() => { setPartyThumbnailFile(null); setPartyThumbnailPreview(null); }}>Remove image</button>}</div><div className="party-form-label">Or choose a party sticker</div><div className="party-sticker-box" role="group" aria-label="Choose a party sticker">{partyStickerOptions.map(sticker => <button key={sticker.id} type="button" className={"party-sticker-option " + (partyStickerId === sticker.id ? "selected" : "")} onClick={() => setPartyStickerId(sticker.id)} aria-pressed={partyStickerId === sticker.id} style={{ background: "linear-gradient(145deg, " + sticker.colors[0] + ", " + sticker.colors[1] + ")" }}><span>{sticker.emoji}</span><small>{sticker.label}</small>{partyStickerId === sticker.id && <i>✓</i>}</button>)}</div><label>Start date and time<input type="datetime-local" value={partyScheduledAt} min={localDateTimeInput(new Date(Date.now() + 5 * 60 * 1000))} onChange={event => setPartyScheduledAt(event.target.value)} required /></label><div className="party-form-label">Choose a format</div><div className="party-format-options"><button type="button" className={partyFormat === "video" ? "selected" : ""} onClick={() => setPartyFormat("video")}><Video size={19}/><b>Video</b><small>Face-to-face hangout</small></button><button type="button" className={partyFormat === "audio" ? "selected" : ""} onClick={() => setPartyFormat("audio")}><Mic size={19}/><b>Audio</b><small>Talk it out</small></button><button type="button" className={partyFormat === "watch" ? "selected" : ""} onClick={() => setPartyFormat("watch")}><Film size={19}/><b>Watch</b><small>Watch together</small></button></div><div className="party-form-label">Who can discover it?</div><div className="party-access-options"><button type="button" className={partyAccess === "public" ? "selected" : ""} onClick={() => setPartyAccess("public")}><Users size={18}/><span><b>Public</b><small>Discoverable and open for RSVP</small></span></button><button type="button" className={partyAccess === "private" ? "selected" : ""} onClick={() => setPartyAccess("private")}><LockKeyhole size={18}/><span><b>Private</b><small>Hidden from the public party list</small></span></button></div><div className="modal-footer"><small>{partyName.length}/70</small><button className="create-button" type="submit" disabled={partySubmitting || partyName.trim().length < 3 || !partyScheduledAt}>{partySubmitting ? "Publishing…" : "Publish party ↗"}</button></div></form></section></div>}
-    {editProfileOpen && <div className="modal-backdrop" onClick={() => setEditProfileOpen(false)}><section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setEditProfileOpen(false)}>×</button><span className="eyebrow">MAKE IT YOURS</span><h2 id="edit-profile-title">Edit your <em>profile.</em></h2><form onSubmit={event => { event.preventDefault(); void saveProfile(); }}><label>Username<input value={usernameDraft} onChange={event => setUsernameDraft(event.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))} maxLength={24} minLength={3} required /><small>3–24 characters · letters, numbers, dots and underscores</small></label><label>Display name<input value={displayNameDraft} onChange={event => setDisplayNameDraft(event.target.value)} maxLength={60} required /></label><label>Bio<textarea value={bioDraft} onChange={event => setBioDraft(event.target.value)} maxLength={300} placeholder="A little about you…" /></label><label className="profile-privacy-setting"><span><b>Private account</b><small>Hides your profile from public profile lookups. Follow requests and approval are a separate feature still to be added.</small></span><input type="checkbox" checked={privacyDraft} onChange={event => setPrivacyDraft(event.target.checked)} /></label><div className="modal-footer"><small>{bioDraft.length}/300</small><button className="create-button" type="submit" disabled={profileSaving || !displayNameDraft.trim() || !usernameDraft.trim()}>{profileSaving ? "Saving…" : "Save profile ↗"}</button></div></form></section></div>}
+    {editProfileOpen && <div className="modal-backdrop" onClick={() => setEditProfileOpen(false)}><section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setEditProfileOpen(false)}>×</button><span className="eyebrow">MAKE IT YOURS</span><h2 id="edit-profile-title">Edit your <em>profile.</em></h2><form onSubmit={event => { event.preventDefault(); void saveProfile(); }}><label>Username<input value={usernameDraft} onChange={event => setUsernameDraft(event.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))} maxLength={24} minLength={3} required /><small>3–24 characters · letters, numbers, dots and underscores</small></label><label>Display name<input value={displayNameDraft} onChange={event => setDisplayNameDraft(event.target.value)} maxLength={60} required /></label><label>Bio<textarea value={bioDraft} onChange={event => setBioDraft(event.target.value)} maxLength={300} placeholder="A little about you…" /></label><label className="profile-privacy-setting"><span><b>Private account</b><small>Only approved followers can follow your private account.</small></span><input type="checkbox" checked={privacyDraft} onChange={event => setPrivacyDraft(event.target.checked)} /></label>{privacyDraft && <section className="follow-request-panel"><h3>Follow requests <span>{incomingFollowRequests.length}</span></h3>{incomingFollowRequests.length === 0 ? <p>No pending requests.</p> : incomingFollowRequests.map(request => <div className="follow-request-row" key={request.id}><div><b>{request.display_name}</b><small>@{request.username}</small></div><button type="button" className="outline-button" disabled={followRequestBusyId === request.id} onClick={() => void respondToFollowRequest(request.id, false)}>Decline</button><button type="button" className="create-button" disabled={followRequestBusyId === request.id} onClick={() => void respondToFollowRequest(request.id, true)}>{followRequestBusyId === request.id ? "Saving…" : "Approve"}</button></div>)}</section>}<div className="modal-footer"><small>{bioDraft.length}/300</small><button className="create-button" type="submit" disabled={profileSaving || !displayNameDraft.trim() || !usernameDraft.trim()}>{profileSaving ? "Saving…" : "Save profile ↗"}</button></div></form></section></div>}
     {createOpen && <div className="modal-backdrop" onClick={() => setCreateOpen(false)}><section className="create-modal media-editor-modal" role="dialog" aria-modal="true" aria-labelledby="create-title" onClick={e=>e.stopPropagation()}><button className="modal-close" type="button" onClick={()=>setCreateOpen(false)}>×</button><span className="eyebrow">ZEECHAT CREATOR STUDIO</span><h2 id="create-title">{mediaFile?.type.startsWith("video/")?"Make your Reel":"Create your post"}</h2><p className="editor-intro">Choose media, tune the look, crop it, add a sound, then share.</p>
 <input ref={mediaPickerRef} className="editor-file-input" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" disabled={busy} onChange={e=>{const file=e.currentTarget.files?.[0]??null;e.currentTarget.value="";if(!file)return;const video=file.type.startsWith("video/");const allowed=video?["video/mp4","video/webm","video/quicktime"]:["image/jpeg","image/png","image/webp","image/gif"];const limit=video?100*1024*1024:8*1024*1024;if(!allowed.includes(file.type)||file.size>limit){setNotice(video?"Choose an MP4, WebM or MOV video smaller than 100 MB.":"Choose a JPG, PNG, WebP or GIF photo smaller than 8 MB.");return;}setMediaFile(file);setPostKind(video?"reel":"post");setEditorFilter("none");setEditorZoom(1);setEditorRatio("original");setSelectedSound(null);setAudioFile(null);}} />
 {!mediaFile?<button type="button" className="editor-gallery-pick" onClick={()=>mediaPickerRef.current?.click()}><span>＋</span><b>Choose from gallery</b><small>Photos go to Home · Videos go to Reels</small></button>:<div className="editor-preview-wrap"><div className={"editor-preview editor-ratio-"+editorRatio}><button type="button" className="editor-change-media" onClick={()=>mediaPickerRef.current?.click()}>Change media</button>{mediaPreview&&(mediaFile.type.startsWith("video/")?<video src={mediaPreview} controls playsInline style={{filter:editorFilterCss,transform:"scale("+editorZoom+")"}}/>:<Image src={mediaPreview} alt="Media preview" width={720} height={900} unoptimized style={{filter:editorFilterCss,transform:"scale("+editorZoom+")"}}/>)}{uploadProgress!==null&&<div className="editor-upload-overlay"><div className="upload-progress-ring" style={{background:"conic-gradient(#45d6a0 "+(uploadProgress*3.6)+"deg,#263a33 0deg)"}}><span>{uploadProgress}%</span></div><b>{uploadLabel||"Publishing…"}</b></div>}</div>
