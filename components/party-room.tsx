@@ -10,6 +10,7 @@ type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-so
 export default function PartyRoom({ party, userId, onClose }: { party: PartyRoomInfo; userId: string; onClose: () => void }) {
   const localVideo = useRef<HTMLVideoElement>(null);
   const watchVideo = useRef<HTMLVideoElement>(null);
+  const watchUrlRef = useRef("");
   const syncingWatchRef = useRef(false);
   const peers = useRef(new Map<string, RTCPeerConnection>());
   const streamRef = useRef<MediaStream | null>(null);
@@ -83,6 +84,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
             if (signal.kind === "watch-source" && party.format === "watch" && signal.url) {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 900);
+              watchUrlRef.current = signal.url;
               setWatchUrl(signal.url);
               setWatchUrlDraft(signal.url);
               if (watchVideo.current) { watchVideo.current.pause(); watchVideo.current.src = signal.url; watchVideo.current.load(); }
@@ -102,6 +104,11 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               if (watchVideo.current) watchVideo.current.currentTime = signal.time;
             } else if (signal.kind === "hello") {
               setParticipants(current => current.includes(signal.from) ? current : [...current, signal.from]);
+              if (party.format === "watch" && watchUrlRef.current) {
+                const video = watchVideo.current;
+                send({ kind: "watch-source", from: userId, to: signal.from, url: watchUrlRef.current });
+                if (video) send({ kind: video.paused ? "watch-pause" : "watch-play", from: userId, to: signal.from, time: video.currentTime });
+              }
               if (party.format !== "watch" && userId.localeCompare(signal.from) < 0) await connectPeer(signal.from, true);
             } else if (signal.kind === "offer" && signal.sdp) {
               let pc = peers.current.get(signal.from);
@@ -177,6 +184,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     try {
       const parsed = new URL(trimmed);
       if (!["https:", "http:"].includes(parsed.protocol)) throw new Error("unsupported protocol");
+      watchUrlRef.current = parsed.toString();
       setWatchUrl(parsed.toString());
       setWatchError("");
       send({ kind: "watch-source", from: userId, url: parsed.toString() });
