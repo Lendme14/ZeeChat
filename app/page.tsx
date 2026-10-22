@@ -927,7 +927,7 @@ export default function HomePage() {
     try {
       const supabase = createClient();
       const { data: messages, error } = await supabase.from("zeechat_messages")
-        .select("id,conversation_id,sender_id,body,created_at,read_at")
+        .select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id")
         .eq("conversation_id", item.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -965,7 +965,7 @@ export default function HomePage() {
       const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });
       if (error) throw error;
       const id=conversationId as string;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at").eq("conversation_id",id).order("created_at",{ascending:true});
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id").eq("conversation_id",id).order("created_at",{ascending:true});
       if (messageError) throw messageError;
       const { data: targetProfile } = await supabase.from("zeechat_profiles").select("avatar_url").eq("user_id",targetUserId).maybeSingle();
       if (requestId !== chatOpenRequestRef.current) return;
@@ -976,25 +976,36 @@ export default function HomePage() {
   }
 
   async function sendLiveMessage() {
-    const body=chatDraft.trim();
-    if(!body || !activeConversationId || !userId) return;
-    const conversationId=activeConversationId;
-    const optimistic: LiveMessage={id:"optimistic-"+crypto.randomUUID(),conversation_id:conversationId,sender_id:userId,body,created_at:new Date().toISOString()};
-    setLiveMessages(current=>[...current,optimistic]);
+    const body = chatDraft.trim();
+    if (!body || !activeConversationId || !userId) return;
+    const conversationId = activeConversationId;
+    const replyToId = replyToMessage?.conversation_id === conversationId ? replyToMessage.id : null;
+    const optimistic: LiveMessage = {
+      id: "optimistic-" + crypto.randomUUID(),
+      conversation_id: conversationId,
+      sender_id: userId,
+      body,
+      created_at: new Date().toISOString(),
+      reply_to_id: replyToId,
+    };
+    setLiveMessages(current => [...current, optimistic]);
     setChatDraft("");
     setReplyToMessage(null);
     try {
-      const supabase=createClient();
-      const { data, error }=await supabase.from("zeechat_messages").insert({conversation_id:conversationId,sender_id:userId,body,reply_to_id:replyToId}).select("id,conversation_id,sender_id,body,created_at,read_at").single();
-      if(error) throw error;
+      const supabase = createClient();
+      const { data, error } = await supabase.from("zeechat_messages")
+        .insert({ conversation_id: conversationId, sender_id: userId, body, reply_to_id: replyToId })
+        .select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id").single();
+      if (error) throw error;
       if (activeConversationRef.current === conversationId) {
-        setLiveMessages(current=>current.map(message=>message.id===optimistic.id ? data as LiveMessage : message));
+        setLiveMessages(current => current.map(message => message.id === optimistic.id ? data as LiveMessage : message));
       }
       await loadInbox(userId);
-    } catch(error) {
-      setLiveMessages(current=>current.filter(message=>message.id!==optimistic.id));
+    } catch (error) {
+      setLiveMessages(current => current.filter(message => message.id !== optimistic.id));
       if (activeConversationRef.current === conversationId) {
-        setChatDraft(current=>current || body);
+        setChatDraft(current => current || body);
+        if (replyToId) setReplyToMessage(optimistic);
         setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again.");
       }
     }
