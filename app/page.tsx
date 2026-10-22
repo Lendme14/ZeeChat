@@ -26,7 +26,7 @@ const partyStickerOptions = [
 ] as const;
 
 type ZeeStory = { id: string; user_id: string; media_url: string; media_path?: string | null; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string; authorName: string; username: string; avatarUrl: string | null };
-type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; thumbnail_url?: string | null; sound_id?: string | null; is_reel?: boolean; };
+type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; thumbnail_url?: string | null; media_path?: string | null; thumbnail_path?: string | null; sound_id?: string | null; is_reel?: boolean; };
 type ZeeSound = { id: string; creator_id: string; title: string; audio_url: string; source_post_id?: string | null; created_at: string; };
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
@@ -574,11 +574,12 @@ export default function HomePage() {
           following: creatorFollowing.error ? 0 : (creatorFollowing.count ?? 0)
         });
         const { data: creatorPosts, error: postsError } = await supabase.from("zeechat_posts")
-          .select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,is_reel")
+          .select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,media_path,thumbnail_path,is_reel")
           .eq("author_id", creator.user_id).in("visibility", ["public", "followers"])
           .order("created_at", { ascending: false }).limit(60);
         if (postsError) throw postsError;
-        if (active) setSelectedCreatorPosts((creatorPosts ?? []) as Post[]);
+        const resolvedCreatorPosts = await resolvePostMedia((creatorPosts ?? []) as Post[]);
+        if (active) setSelectedCreatorPosts(resolvedCreatorPosts);
         if (userId && creator.user_id !== userId) {
           const { data: follow } = await supabase.from("zeechat_follows").select("follower_id")
             .eq("follower_id", userId).eq("followed_id", creator.user_id).maybeSingle();
@@ -738,11 +739,11 @@ export default function HomePage() {
       });
       unsubscribeAuth = () => authListener.subscription.unsubscribe();
       supabase.from("zeechat_sounds").select("id,creator_id,title,audio_url,source_post_id,created_at").order("created_at", { ascending: false }).limit(100).then(({data}) => { if (active && data) setSounds(data as ZeeSound[]); });
-      supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,sound_id,is_reel").in("visibility", ["public", "followers"]).order("created_at", { ascending: false }).limit(200)
+      supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,media_path,thumbnail_path,sound_id,is_reel").in("visibility", ["public", "followers"]).order("created_at", { ascending: false }).limit(200)
         .then(async ({ data, error }) => {
           if (!active) return;
           if (error) { setNotice("Connect Supabase to load live posts."); return; }
-          const loadedPosts = (data ?? []) as Post[];
+          const loadedPosts = await resolvePostMedia((data ?? []) as Post[]);
           setPosts(loadedPosts);
           if (!loadedPosts.length) return;
           const { data: views } = await supabase.rpc("zeechat_post_view_counts", { post_ids: loadedPosts.map(post => post.id) });
@@ -1508,6 +1509,23 @@ export default function HomePage() {
     catch { return null; }
   }
 
+  async function resolvePostMedia(rows: Post[]): Promise<Post[]> {
+    const supabase = createClient();
+    return Promise.all(rows.map(async post => {
+      let mediaUrl = post.media_url ?? null;
+      let thumbnailUrl = post.thumbnail_url ?? null;
+      if (post.media_path) {
+        const { data, error } = await supabase.storage.from("zeechat-private-posts").createSignedUrl(post.media_path, 3600);
+        mediaUrl = error ? null : (data?.signedUrl ?? null);
+      }
+      if (post.thumbnail_path) {
+        const { data, error } = await supabase.storage.from("zeechat-private-posts").createSignedUrl(post.thumbnail_path, 3600);
+        thumbnailUrl = error ? null : (data?.signedUrl ?? null);
+      }
+      return { ...post, media_url: mediaUrl, thumbnail_url: thumbnailUrl };
+    }));
+  }
+
   async function deletePost(post: Post) {
     if (!userId) { setNotice("Sign in to delete your post."); return; }
     if (post.author_id !== userId) { setNotice("You can only delete your own posts."); return; }
@@ -1517,11 +1535,16 @@ export default function HomePage() {
       const supabase = createClient();
       const { error } = await supabase.from("zeechat_posts").delete().eq("id", post.id).eq("author_id", userId);
       if (error) throw error;
-      const paths = [...new Set([storageObjectPath(post.media_url), storageObjectPath(post.thumbnail_url)].filter((p): p is string => Boolean(p && p.startsWith(userId + "/"))))];
+      const privatePaths = [...new Set([post.media_path, post.thumbnail_path].filter((p): p is string => Boolean(p && p.startsWith(userId + "/"))))];
+      const legacyPaths = [...new Set([storageObjectPath(post.media_url), storageObjectPath(post.thumbnail_url)].filter((p): p is string => Boolean(p && p.startsWith(userId + "/"))))];
       let mediaCleanupFailed = false;
-      if (paths.length) {
-        const { error: storageError } = await supabase.storage.from("zeechat-media").remove(paths);
-        if (storageError) { mediaCleanupFailed = true; console.warn("Post deleted, but some media files could not be removed", storageError); }
+      if (privatePaths.length) {
+        const { error: storageError } = await supabase.storage.from("zeechat-private-posts").remove(privatePaths);
+        if (storageError) { mediaCleanupFailed = true; console.warn("Post deleted, but private media files could not be removed", storageError); }
+      }
+      if (legacyPaths.length) {
+        const { error: storageError } = await supabase.storage.from("zeechat-media").remove(legacyPaths);
+        if (storageError) { mediaCleanupFailed = true; console.warn("Post deleted, but legacy media files could not be removed", storageError); }
       }
       setPosts(items => items.filter(item => item.id !== post.id));
       setOpenCommentPostIds(ids => ids.filter(id => id !== post.id));
@@ -1595,7 +1618,7 @@ export default function HomePage() {
   }
 
 
-  function uploadWithProgress(path: string, file: File | Blob, contentType: string, onProgress: (percent: number) => void): Promise<void> {
+  function uploadWithProgress(path: string, file: File | Blob, contentType: string, onProgress: (percent: number) => void, bucket = "zeechat-media"): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
         const supabase = createClient();
@@ -1603,7 +1626,7 @@ export default function HomePage() {
         if (sessionError) throw sessionError;
         if (!session?.access_token) throw new Error("Your session expired. Sign in again to upload.");
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/object/zeechat-media/" + path.split("/").map(encodeURIComponent).join("/"));
+        xhr.open("POST", process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/object/" + bucket + "/" + path.split("/").map(encodeURIComponent).join("/"));
         xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
         xhr.setRequestHeader("Authorization", "Bearer " + session.access_token);
         xhr.setRequestHeader("Content-Type", contentType);
@@ -1781,6 +1804,9 @@ export default function HomePage() {
     setUploadLabel(mediaFile?.type.startsWith("video/") ? "Preparing your Reel…" : "Uploading your post…");
     const supabase = createClient();
     const uploadedPaths: string[] = [];
+    const uploadedPrivatePaths: string[] = [];
+    let mediaPath: string | null = null;
+    let storedThumbnailPath: string | null = null;
     let postInserted = false;
     try {
       const uploadMedia = mediaFile ? await prepareImageForPublish(mediaFile) : null;
@@ -1798,17 +1824,19 @@ export default function HomePage() {
         const path = userId + "/" + crypto.randomUUID() + "." + extension;
         setUploadLabel(isVideo ? "Uploading video…" : "Uploading photo…");
         setUploadProgress(0);
-        await uploadWithProgress(path, uploadMedia, uploadMedia.type, setUploadProgress);
-        uploadedPaths.push(path);
-        mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(path).data.publicUrl;
+        await uploadWithProgress(path, uploadMedia, uploadMedia.type, setUploadProgress, "zeechat-private-posts");
+        uploadedPrivatePaths.push(path);
+        mediaPath = path;
+        mediaUrl = null;
         publishedType = isVideo ? "reel" : "image";
         if (isVideo) {
           const thumbnail = await createVideoThumbnail(uploadMedia);
           const thumbnailPath = userId + "/" + crypto.randomUUID() + ".jpg";
           setUploadLabel("Finishing Reel thumbnail…");
-          await uploadWithProgress(thumbnailPath, thumbnail, "image/jpeg", () => {});
-          uploadedPaths.push(thumbnailPath);
-          thumbnailUrl = supabase.storage.from("zeechat-media").getPublicUrl(thumbnailPath).data.publicUrl;
+          await uploadWithProgress(thumbnailPath, thumbnail, "image/jpeg", () => {}, "zeechat-private-posts");
+          uploadedPrivatePaths.push(thumbnailPath);
+          storedThumbnailPath = thumbnailPath;
+          thumbnailUrl = null;
         }
       }
       if (audioFile && !selectedSound) {
@@ -1827,7 +1855,7 @@ export default function HomePage() {
       }
       const makeReel = Boolean(mediaFile?.type.startsWith("video/"));
       if (makeReel && !mediaFile) throw new Error("Choose a photo or video for your sound Reel.");
-      const { data: createdPost, error } = await supabase.from("zeechat_posts").insert({ author_id: userId, caption: caption.trim(), post_type: makeReel ? "reel" : publishedType, is_reel: makeReel, sound_id: soundId, media_url: mediaUrl, thumbnail_url: thumbnailUrl, visibility: profile?.is_private ? "followers" : "public" }).select("id").single();
+      const { data: createdPost, error } = await supabase.from("zeechat_posts").insert({ author_id: userId, caption: caption.trim(), post_type: makeReel ? "reel" : publishedType, is_reel: makeReel, sound_id: soundId, media_url: mediaUrl, thumbnail_url: thumbnailUrl, media_path: mediaPath, thumbnail_path: storedThumbnailPath, visibility: profile?.is_private ? "followers" : "public" }).select("id").single();
       if (error) throw error;
       postInserted = true;
       if (selectedDraftId) {
@@ -1842,9 +1870,9 @@ export default function HomePage() {
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       setPendingUploadPost(current => current?.id === pendingId ? null : current);
       setCaption(""); setMediaFile(null); setAudioFile(null); setSelectedSound(null); setPostKind("post"); setEditorFilter("none"); setEditorZoom(1); setEditorRatio("original"); setCreateOpen(false); setNotice(makeReel ? "Your Reel is live!" : "Your post is live!");
-      const { data, error: refreshError } = await supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url").in("visibility", ["public", "followers"]).order("created_at", { ascending: false }).limit(10);
+      const { data, error: refreshError } = await supabase.from("zeechat_posts").select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,media_path,thumbnail_path").in("visibility", ["public", "followers"]).order("created_at", { ascending: false }).limit(10);
       if (refreshError) throw new Error("Your post was published, but Home could not refresh. Reload the page to see it.");
-      const refreshedPosts = (data ?? []) as Post[];
+      const refreshedPosts = await resolvePostMedia((data ?? []) as Post[]);
       setPosts(refreshedPosts);
       const authorIds = [...new Set(refreshedPosts.map(post => post.author_id))];
       if (authorIds.length) {
@@ -1858,6 +1886,7 @@ export default function HomePage() {
       // Keep the owner on the page they chose while the post completes.
     } catch (error) {
       if (!postInserted && uploadedPaths.length) await supabase.storage.from("zeechat-media").remove(uploadedPaths).catch(() => undefined);
+      if (!postInserted && uploadedPrivatePaths.length) await supabase.storage.from("zeechat-private-posts").remove(uploadedPrivatePaths).catch(() => undefined);
       setUploadProgress(null); setUploadLabel("");
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       setPendingUploadPost(current => current?.id === pendingId ? null : current);
