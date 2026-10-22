@@ -92,6 +92,13 @@ export default function HomePage() {
   const [partyDescription, setPartyDescription] = useState("");
   const [partyFormat, setPartyFormat] = useState<"video" | "audio" | "watch">("video");
   const [partyAccess, setPartyAccess] = useState<"public" | "private">("public");
+  const [partyScheduledAt, setPartyScheduledAt] = useState(() => localDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [partyEntries, setPartyEntries] = useState<PartyEntry[]>([]);
+  const [partyJoinedIds, setPartyJoinedIds] = useState<string[]>([]);
+  const [partyLoading, setPartyLoading] = useState(false);
+  const [partySubmitting, setPartySubmitting] = useState(false);
+  const [partyBusyIds, setPartyBusyIds] = useState<string[]>([]);
+  const [partyFilter, setPartyFilter] = useState<"all" | "live" | "upcoming" | "mine">("all");
   const [caption, setCaption] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -212,6 +219,116 @@ export default function HomePage() {
       });
     return () => { active = false; };
   }, [userId]);
+
+  const loadParties = useCallback(async () => {
+    if (!userId) { setPartyEntries([]); setPartyJoinedIds([]); setPartyLoading(false); return; }
+    setPartyLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.from("zeechat_parties")
+        .select("id,host_id,title,description,format,access,status,scheduled_at,participant_count,created_at")
+        .or(`access.eq.public,host_id.eq.${userId}`).neq("status", "ended")
+        .order("scheduled_at", { ascending: true }).limit(100);
+      if (error) throw error;
+      const rows = (data ?? []) as Omit<PartyEntry, "hostName" | "hostUsername">[];
+      const hostIds = [...new Set(rows.map(party => party.host_id))];
+      const { data: hosts, error: hostError } = hostIds.length
+        ? await supabase.from("zeechat_profiles").select("user_id,username,display_name").in("user_id", hostIds)
+        : { data: [], error: null };
+      if (hostError) throw hostError;
+      const hostMap = new Map((hosts ?? []).map(host => [host.user_id, host]));
+      const { data: memberships, error: membershipError } = await supabase.from("zeechat_party_members").select("party_id").eq("user_id", userId);
+      if (membershipError) throw membershipError;
+      setPartyEntries(rows.map(party => {
+        const host = hostMap.get(party.host_id);
+        return { ...party, hostName: host?.display_name || "ZeeChat host", hostUsername: host?.username || "member" };
+      }));
+      setPartyJoinedIds((memberships ?? []).map(member => member.party_id));
+    } catch (error) {
+      setNotice(error instanceof Error ? "Parties couldn’t load: " + error.message : "Parties couldn’t load. Please try again.");
+    } finally { setPartyLoading(false); }
+  }, [userId]);
+
+  useEffect(() => {
+    if (view !== "Parties") return;
+    void loadParties();
+    let client: ReturnType<typeof createClient> | null = null;
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+    try {
+      client = createClient();
+      channel = client.channel("zeechat-parties-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "zeechat_parties" }, () => { void loadParties(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "zeechat_party_members" }, () => { void loadParties(); })
+        .subscribe();
+    } catch { /* Manual refresh remains available when realtime is unavailable. */ }
+    return () => { if (channel && client) void client.removeChannel(channel); };
+  }, [view, loadParties]);
+
+  async function createParty(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!userId) { setNotice("Sign in to create a party."); return; }
+    const title = partyName.trim();
+    if (title.length < 3) { setNotice("Party names need at least 3 characters."); return; }
+    const scheduled = new Date(partyScheduledAt);
+    if (!Number.isFinite(scheduled.getTime()) || scheduled.getTime() < Date.now() - 60_000) { setNotice("Choose a future start time."); return; }
+    setPartySubmitting(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.from("zeechat_parties").insert({
+        host_id: userId, title, description: partyDescription.trim(), format: partyFormat,
+        access: partyAccess, scheduled_at: scheduled.toISOString(), status: "scheduled",
+      }).select("id").single();
+      if (error) throw error;
+      if (partyAccess === "public") {
+        const { error: memberError } = await supabase.from("zeechat_party_members").insert({ party_id: data.id, user_id: userId });
+        if (memberError) console.warn("Party created, but host RSVP failed", memberError);
+      }
+      setPartyName(""); setPartyDescription(""); setPartyAccess("public");
+      setPartyScheduledAt(localDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+      setPartyCreateOpen(false);
+      await loadParties();
+      setNotice("Your party is scheduled and published.");
+    } catch (error) {
+      setNotice(error instanceof Error ? "Could not create party: " + error.message : "Could not create your party. Please try again.");
+    } finally { setPartySubmitting(false); }
+  }
+
+  async function togglePartyMembership(party: PartyEntry) {
+    if (!userId) { setNotice("Sign in to join a party or RSVP."); return; }
+    if (party.host_id === userId) { setNotice("You’re hosting this party."); return; }
+    setPartyBusyIds(current => [...current, party.id]);
+    try {
+      const supabase = createClient();
+      if (partyJoinedIds.includes(party.id)) {
+        const { error } = await supabase.from("zeechat_party_members").delete().eq("party_id", party.id).eq("user_id", userId);
+        if (error) throw error;
+        setPartyJoinedIds(current => current.filter(id => id !== party.id));
+        setPartyEntries(current => current.map(item => item.id === party.id ? { ...item, participant_count: Math.max(0, item.participant_count - 1) } : item));
+        setNotice("You’ve left the guest list.");
+      } else {
+        const { error } = await supabase.from("zeechat_party_members").insert({ party_id: party.id, user_id: userId });
+        if (error && error.code !== "23505") throw error;
+        setPartyJoinedIds(current => current.includes(party.id) ? current : [...current, party.id]);
+        setPartyEntries(current => current.map(item => item.id === party.id ? { ...item, participant_count: item.participant_count + (error ? 0 : 1) } : item));
+        setNotice(party.status === "live" ? "You’re on the guest list. Live audio/video calling isn’t connected yet." : "You’re going! Your RSVP is saved.");
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? "Couldn’t update your RSVP: " + error.message : "Couldn’t update your RSVP. Please try again.");
+    } finally { setPartyBusyIds(current => current.filter(id => id !== party.id)); }
+  }
+
+  async function updatePartyStatus(party: PartyEntry, status: "live" | "ended") {
+    if (!userId || party.host_id !== userId) return;
+    setPartyBusyIds(current => [...current, party.id]);
+    try {
+      const { error } = await createClient().from("zeechat_parties").update({ status, updated_at: new Date().toISOString() }).eq("id", party.id).eq("host_id", userId);
+      if (error) throw error;
+      await loadParties();
+      setNotice(status === "live" ? "Party marked live. Guests can now find and join the listing." : "Party ended and removed from discovery.");
+    } catch (error) {
+      setNotice(error instanceof Error ? "Couldn’t update your party: " + error.message : "Couldn’t update your party.");
+    } finally { setPartyBusyIds(current => current.filter(id => id !== party.id)); }
+  }
 
   const unreadConversationCount = inboxConversations.filter(item => item.unreadCount > 0).length;
   const filteredInboxConversations = inboxConversations.filter(item => (inboxFilter !== "unread" || item.unreadCount > 0) && `${item.displayName} ${item.username} ${item.lastMessage}`.toLowerCase().includes(inboxSearch.trim().toLowerCase()));
