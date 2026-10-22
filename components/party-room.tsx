@@ -66,6 +66,9 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     const discardPeer = () => {
       if (disconnectTimer !== undefined) window.clearTimeout(disconnectTimer);
       if (peers.current.get(remoteId) !== pc) return;
+      // Tell the other participant to discard its stale peer too; otherwise it may
+      // ignore our new offer because it still believes the old connection exists.
+      send({ kind: "leave", from: userId, to: remoteId });
       peers.current.delete(remoteId);
       pendingIce.current.delete(remoteId);
       pc.close();
