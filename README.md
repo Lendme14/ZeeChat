@@ -9,6 +9,7 @@ Production: https://zee-chat-three.vercel.app
 - Responsive, installable web-app shell with mobile safe-area and navigation support.
 - Supabase email authentication and user profiles.
 - Home feed for text and photo posts, plus a Reels experience with like, comment, save, and creator insights.
+- Stories: signed-in users can upload photo or video stories, view active stories, and stories expire after 24 hours. Requires the `zeechat_stories` migration.
 - Discover creator search and feed filters.
 - Direct conversations with realtime message delivery, unread counts, and in-app notifications.
 - Daily Caption Battle with voting and a weekly leaderboard.
