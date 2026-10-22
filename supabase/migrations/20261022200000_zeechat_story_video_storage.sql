@@ -11,6 +11,13 @@ set
     'video/mp4',
     'video/webm',
     'video/quicktime',
-    'video/ogg'
+    'video/ogg',
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/aac',
+    'audio/ogg',
+    'audio/wav',
+    'audio/webm',
+    'audio/x-wav'
   ]
 where id = 'zeechat-media';
