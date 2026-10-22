@@ -575,6 +575,7 @@ export default function HomePage() {
             const { data: request } = await supabase.from("zeechat_follow_requests").select("id,status").eq("requester_id", userId).eq("target_id", creator.user_id).eq("status", "pending").maybeSingle();
             if (active && request) setPendingFollowRequestUserIds(current => current.includes(creator.user_id) ? current : [...current, creator.user_id]);
           }
+        }
       } catch (error) {
         if (active) {
           setSelectedCreatorProfile(null);
