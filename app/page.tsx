@@ -25,7 +25,7 @@ const partyStickerOptions = [
   { id: "creative", label: "Creative minds", emoji: "🎨", colors: ["#6d28d9", "#ec4899"] },
 ] as const;
 
-type ZeeStory = { id: string; user_id: string; media_url: string; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string; authorName: string; username: string; avatarUrl: string | null };
+type ZeeStory = { id: string; user_id: string; media_url: string; media_path?: string | null; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string; authorName: string; username: string; avatarUrl: string | null };
 type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; thumbnail_url?: string | null; sound_id?: string | null; is_reel?: boolean; };
 type ZeeSound = { id: string; creator_id: string; title: string; audio_url: string; source_post_id?: string | null; created_at: string; };
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
@@ -499,11 +499,17 @@ export default function HomePage() {
       try {
         const supabase = createClient();
         const { data, error } = await supabase.from("zeechat_stories")
-          .select("id,user_id,media_url,media_type,caption,created_at,expires_at")
+          .select("id,user_id,media_url,media_path,media_type,caption,created_at,expires_at")
           .gt("expires_at", new Date().toISOString())
           .order("created_at", { ascending: true }).limit(100);
         if (error) throw error;
-        const rows = (data ?? []) as { id: string; user_id: string; media_url: string; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string }[];
+        const rawRows = (data ?? []) as { id: string; user_id: string; media_url: string; media_path?: string | null; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string }[];
+        const rows = await Promise.all(rawRows.map(async story => {
+          if (!story.media_path) return story; // Older Stories remain readable while their public media migrates out.
+          const secondsRemaining = Math.max(60, Math.min(86400, Math.floor((Date.parse(story.expires_at) - Date.now()) / 1000)));
+          const { data: signed, error: signError } = await supabase.storage.from("zeechat-private-stories").createSignedUrl(story.media_path, secondsRemaining);
+          return { ...story, media_url: signError ? "" : (signed?.signedUrl ?? "") };
+        }));
         const authorIds = [...new Set(rows.map(story => story.user_id))];
         const { data: authors, error: authorsError } = authorIds.length
           ? await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", authorIds)
@@ -1658,27 +1664,37 @@ export default function HomePage() {
     const extension = file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
     const path = userId + "/story-" + crypto.randomUUID() + "." + extension.replace(/[^a-z0-9]/g, "");
     setStoryUploading(true);
+    let uploaded = false;
+    let insertedStoryId: string | null = null;
     try {
       const supabase = createClient();
-      const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(path, file, {
+      const { error: uploadError } = await supabase.storage.from("zeechat-private-stories").upload(path, file, {
         contentType: file.type, cacheControl: "3600", upsert: false,
       });
       if (uploadError) throw new Error("Story upload failed: " + uploadError.message);
-      const mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(path).data.publicUrl;
+      uploaded = true;
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase.from("zeechat_stories").insert({
-        user_id: userId, media_url: mediaUrl, media_type: isVideo ? "video" : "image",
-        caption: "", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      }).select("id,user_id,media_url,media_type,caption,created_at,expires_at").single();
+        user_id: userId, media_url: "", media_path: path, media_type: isVideo ? "video" : "image",
+        caption: "", expires_at: expiresAt,
+      }).select("id,user_id,media_url,media_path,media_type,caption,created_at,expires_at").single();
       if (error) throw error;
+      insertedStoryId = data.id;
+      const { data: signed, error: signError } = await supabase.storage.from("zeechat-private-stories").createSignedUrl(path, 24 * 60 * 60);
+      if (signError || !signed?.signedUrl) throw signError || new Error("Could not prepare private Story media.");
       const newStory: ZeeStory = {
-        ...data, authorName: profile?.display_name || profile?.username || "You",
+        ...data, media_url: signed.signedUrl,
+        authorName: profile?.display_name || profile?.username || "You",
         username: profile?.username || "you", avatarUrl: profile?.avatar_url || null,
       } as ZeeStory;
       setStoryItems(current => [...current.filter(story => story.id !== newStory.id), newStory]);
       setActiveStoryId(newStory.id);
-      setNotice("Your story is live for 24 hours.");
+      setNotice("Your Story is live for 24 hours.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not publish your story. Please try again.");
+      const supabase = createClient();
+      if (insertedStoryId) { try { await supabase.from("zeechat_stories").delete().eq("id", insertedStoryId).eq("user_id", userId); } catch { /* Preserve the original error. */ } }
+      if (uploaded) { try { await supabase.storage.from("zeechat-private-stories").remove([path]); } catch { /* Preserve the original error. */ } }
+      setNotice(error instanceof Error ? error.message : "Could not publish your Story. Please try again.");
     } finally { setStoryUploading(false); }
   }
 
