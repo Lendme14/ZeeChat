@@ -123,7 +123,8 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
             } else if (signal.kind === "watch-seek" && party.format === "watch" && typeof signal.time === "number") {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
-              if (getYouTubeVideoId(watchUrlRef.current)) setYoutubeCommand({ kind: "watch-seek", time: signal.time, nonce: ++watchActionNonce.current });\n              else if (watchVideo.current) watchVideo.current.currentTime = signal.time;
+              if (getYouTubeVideoId(watchUrlRef.current)) setYoutubeCommand({ kind: "watch-seek", time: signal.time, nonce: ++watchActionNonce.current });
+              else if (watchVideo.current) watchVideo.current.currentTime = signal.time;
             } else if (signal.kind === "hello") {
               setParticipants(current => current.includes(signal.from) ? current : [...current, signal.from]);
               if (party.format === "watch" && watchUrlRef.current) {
