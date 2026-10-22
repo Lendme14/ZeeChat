@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 function formatVideoTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const total = Math.floor(seconds); return Math.floor(total / 60) + ":" + String(total % 60).padStart(2, "0"); }
 
 type View = "Home" | "Reels" | "Discover" | "Parties" | "Chats" | "Profile";
+type PartyEntry = { id: string; host_id: string; title: string; description: string; format: "video" | "audio" | "watch"; access: "public" | "private"; status: "scheduled" | "live" | "ended"; scheduled_at: string; participant_count: number; created_at: string; hostName: string; hostUsername: string };
 type Post = { id: string; caption: string; created_at: string; author_id: string; post_type: string; media_url?: string | null; thumbnail_url?: string | null; sound_id?: string | null; is_reel?: boolean; };
 type ZeeSound = { id: string; creator_id: string; title: string; audio_url: string; source_post_id?: string | null; created_at: string; };
 type PostAuthor = { username: string; display_name: string; avatar_url?: string | null; };
