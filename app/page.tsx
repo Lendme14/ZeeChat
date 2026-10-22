@@ -756,6 +756,20 @@ export default function HomePage() {
             .sort((a, b) => a.created_at.localeCompare(b.created_at)));
         void loadInbox(userId);
       })
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "zeechat_messages",
+        filter: "conversation_id=eq." + activeConversationId
+      }, payload => {
+        if (!active) return;
+        const updated = payload.new as LiveMessage;
+        if (!updated?.id || updated.conversation_id !== activeConversationId) return;
+        setLiveMessages(current => current.map(message => message.id === updated.id
+          ? { ...message, read_at: updated.read_at ?? message.read_at }
+          : message));
+        void loadInbox(userId);
+      })
       .subscribe();
     return () => {
       active = false;
