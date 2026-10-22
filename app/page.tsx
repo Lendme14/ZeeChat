@@ -542,7 +542,7 @@ export default function HomePage() {
       try {
         const supabase = createClient();
         const { data: creator, error } = await supabase.from("zeechat_profiles")
-          .select("user_id,username,display_name,bio,avatar_url,cover_url")
+          .select("user_id,username,display_name,bio,avatar_url,cover_url,is_private")
           .eq("username", selectedCreatorUsername).maybeSingle();
         if (error) throw error;
         if (!creator) {
@@ -571,7 +571,10 @@ export default function HomePage() {
           const { data: follow } = await supabase.from("zeechat_follows").select("follower_id")
             .eq("follower_id", userId).eq("followed_id", creator.user_id).maybeSingle();
           if (active) setCreatorFollowState(state => ({ ...state, [creator.username]: Boolean(follow) }));
-        }
+          if (active && !follow && creator.is_private) {
+            const { data: request } = await supabase.from("zeechat_follow_requests").select("id,status").eq("requester_id", userId).eq("target_id", creator.user_id).eq("status", "pending").maybeSingle();
+            if (active && request) setPendingFollowRequestUserIds(current => current.includes(creator.user_id) ? current : [...current, creator.user_id]);
+          }
       } catch (error) {
         if (active) {
           setSelectedCreatorProfile(null);
