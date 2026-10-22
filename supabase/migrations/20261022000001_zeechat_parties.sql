@@ -106,7 +106,7 @@ create trigger zeechat_party_participant_count
   after insert or delete on public.zeechat_party_members
   for each row execute function private.zeechat_update_party_participant_count();
 
-do $
+do $realtime$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     if not exists (
@@ -123,7 +123,7 @@ begin
     end if;
   end if;
 end;
-$;
+$realtime$;
 
 grant select, insert, update, delete on public.zeechat_parties to authenticated;
 grant select, insert, delete on public.zeechat_party_members to authenticated;
