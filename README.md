@@ -35,6 +35,16 @@ Requirements: Node.js 20 or newer.
 
 Never put a Supabase service-role key in client-side code or in a `NEXT_PUBLIC_*` variable.
 
+### Optional live-party TURN relay
+
+Live rooms use public STUN servers by default. To improve connectivity on restrictive mobile/Wi-Fi networks, configure a TURN provider that supports the coturn REST shared-secret credential format:
+
+- `TURN_URLS`: comma-separated `turn:` / `turns:` URLs from your provider.
+- `TURN_SHARED_SECRET`: the provider's REST API shared secret. Keep this server-only; never prefix it with `NEXT_PUBLIC_`.
+- `TURN_TTL_SECONDS` (optional): temporary credential lifetime, from 300 to 86400 seconds (default 3600).
+
+The authenticated `/api/party-ice` route issues per-user temporary credentials and disables caching. Without these settings, parties continue using STUN only. Use a provider that supports time-limited credentials; do not put permanent TURN usernames/passwords in browser environment variables.
+
 ## Checks
 
 Run the available project checks before submitting changes:
