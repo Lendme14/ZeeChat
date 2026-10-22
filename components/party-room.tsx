@@ -5,10 +5,11 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Radio, LoaderCircle } fr
 import { createClient } from "@/lib/supabase/client";
 
 type PartyRoomInfo = { id: string; title: string; format: "video" | "audio" | "watch"; host_id: string };
-type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave"; from: string; to?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit };
+type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-source" | "watch-play" | "watch-pause" | "watch-seek"; from: string; to?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit; url?: string; time?: number };
 
 export default function PartyRoom({ party, userId, onClose }: { party: PartyRoomInfo; userId: string; onClose: () => void }) {
   const localVideo = useRef<HTMLVideoElement>(null);
+  const watchVideo = useRef<HTMLVideoElement>(null);
   const peers = useRef(new Map<string, RTCPeerConnection>());
   const streamRef = useRef<MediaStream | null>(null);
   const pendingIce = useRef(new Map<string, RTCIceCandidateInit[]>());
@@ -19,6 +20,8 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [participants, setParticipants] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [connecting, setConnecting] = useState(true);
+  const [watchUrl, setWatchUrl] = useState("");
+  const [watchUrlDraft, setWatchUrlDraft] = useState("");
 
   const send = useCallback((signal: Signal) => {
     const channel = channelRef.current;
@@ -61,7 +64,10 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support camera or microphone access. Open ZeeChat over HTTPS in a modern browser.");
         const wantsVideo = party.format === "video";
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantsVideo });
+        const wantsAudio = party.format !== "watch";
+        const stream = wantsAudio || wantsVideo
+          ? await navigator.mediaDevices.getUserMedia({ audio: wantsAudio, video: wantsVideo })
+          : new MediaStream();
         if (cancelled) { stream.getTracks().forEach(track => track.stop()); return; }
         streamRef.current = stream;
         if (localVideo.current) localVideo.current.srcObject = stream;
@@ -72,7 +78,19 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
           const signal = payload as Signal;
           if (!signal || signal.from === userId || (signal.to && signal.to !== userId)) return;
           try {
-            if (signal.kind === "hello") {
+            if (signal.kind === "watch-source" && party.format === "watch" && signal.url) {
+              setWatchUrl(signal.url);
+              setWatchUrlDraft(signal.url);
+              if (watchVideo.current) { watchVideo.current.pause(); watchVideo.current.src = signal.url; watchVideo.current.load(); }
+            } else if (signal.kind === "watch-play" && party.format === "watch") {
+              const video = watchVideo.current;
+              if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; await video.play().catch(() => undefined); }
+            } else if (signal.kind === "watch-pause" && party.format === "watch") {
+              const video = watchVideo.current;
+              if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; video.pause(); }
+            } else if (signal.kind === "watch-seek" && party.format === "watch" && typeof signal.time === "number") {
+              if (watchVideo.current) watchVideo.current.currentTime = signal.time;
+            } else if (signal.kind === "hello") {
               setParticipants(current => current.includes(signal.from) ? current : [...current, signal.from]);
               if (userId.localeCompare(signal.from) < 0) await connectPeer(signal.from, true);
             } else if (signal.kind === "offer" && signal.sdp) {
@@ -143,10 +161,27 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     streamRef.current?.getVideoTracks().forEach(track => { track.enabled = !next; });
   }
   function leave() { onClose(); }
+  function setWatchSource(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = watchUrlDraft.trim();
+    try {
+      const parsed = new URL(trimmed);
+      if (!["https:", "http:"].includes(parsed.protocol)) throw new Error("unsupported protocol");
+      setWatchUrl(parsed.toString());
+      send({ kind: "watch-source", from: userId, url: parsed.toString() });
+    } catch {
+      setError("Enter a valid http or https video URL. Direct MP4/WebM links work best; some sites block playback outside their own player.");
+    }
+  }
+  function broadcastWatchAction(kind: "watch-play" | "watch-pause" | "watch-seek") {
+    const video = watchVideo.current;
+    if (!video) return;
+    send({ kind, from: userId, time: video.currentTime });
+  }
 
   return <section className="party-room-overlay" role="dialog" aria-modal="true" aria-label={party.title}>
     <header className="party-room-header"><div><span className="party-room-live"><Radio size={13}/> LIVE ROOM</span><h2>{party.title}</h2><p><Users size={14}/> {participants.length + 1} connected · {party.format === "audio" ? "Audio party" : party.format === "watch" ? "Watch party room" : "Video party"}</p></div><button type="button" className="party-room-leave" onClick={leave}><PhoneOff size={17}/> Leave</button></header>
-    {error ? <div className="party-room-error"><b>Couldn’t join the room</b><p>{error}</p><button type="button" onClick={leave}>Back to parties</button></div> : <><div className={"party-room-stage " + (party.format === "audio" ? "audio-stage" : "")}>
+    {error ? <div className="party-room-error"><b>{connecting ? "Couldn’t join the room" : "Something needs attention"}</b><p>{error}</p><button type="button" onClick={() => setError("")}>Dismiss</button><button type="button" onClick={leave}>Back to parties</button></div> : <>{party.format === "watch" && <section className="party-watch-panel"><form className="party-watch-source" onSubmit={setWatchSource}><label htmlFor="party-watch-url">Video URL</label><input id="party-watch-url" type="url" value={watchUrlDraft} onChange={event => setWatchUrlDraft(event.target.value)} placeholder="https://example.com/video.mp4" maxLength={2000} /><button type="submit">Share video</button></form>{watchUrl ? <video ref={watchVideo} className="party-watch-player" src={watchUrl} controls playsInline onPlay={() => broadcastWatchAction("watch-play")} onPause={() => broadcastWatchAction("watch-pause")} onSeeked={() => broadcastWatchAction("watch-seek")} /> : <div className="party-watch-empty"><b>Choose a video to watch together</b><p>Share a direct video link such as MP4 or WebM. Playback support depends on the host website.</p></div>}</section>}<div className={"party-room-stage " + (party.format === "audio" || party.format === "watch" ? "audio-stage" : "")}>
       <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">You</div>}<span>You {party.host_id === userId ? "· Host" : ""}</span></article>
       {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} audioOnly={party.format === "audio"}/>)}
       {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
