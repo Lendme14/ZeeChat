@@ -241,14 +241,21 @@ export default function HomePage() {
       if (createOpen) { setCreateOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
       if (partyCreateOpen) { setPartyCreateOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
       if (notificationsOpen) { setNotificationsOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (activeStoryId) { setActiveStoryId(null); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      const validViews: View[] = ["Home","Reels","Discover","Parties","Chats","Profile"];
       const target = event.state?.zeechatView as View | undefined;
-      if (target && ["Home","Reels","Discover","Parties","Chats","Profile"].includes(target)) setView(target);
-      else setView(currentViewRef.current === "Home" ? "Home" : (viewHistoryRef.current.length > 1 ? viewHistoryRef.current[viewHistoryRef.current.length-2] : "Home"));
-      window.history.pushState({zeechatApp:true,zeechatView:target ?? "Home"},"",url);
+      const nextView = target && validViews.includes(target)
+        ? target
+        : (viewHistoryRef.current.length > 1 ? viewHistoryRef.current[viewHistoryRef.current.length - 2] : "Home");
+      setView(nextView);
+      const targetIndex = viewHistoryRef.current.lastIndexOf(nextView);
+      if (targetIndex >= 0) viewHistoryRef.current = viewHistoryRef.current.slice(0, targetIndex + 1);
+      else viewHistoryRef.current = [nextView];
+      window.history.pushState({zeechatApp:true,zeechatView:nextView},"",url);
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, [createOpen,partyCreateOpen,notificationsOpen]);
+  }, [createOpen,partyCreateOpen,notificationsOpen,activeStoryId]);
   useEffect(() => {
     if (viewHistoryRef.current[viewHistoryRef.current.length-1] !== view) viewHistoryRef.current.push(view);
     window.history.pushState({zeechatApp:true,zeechatView:view},"",window.location.pathname+window.location.search);
