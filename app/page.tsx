@@ -1684,26 +1684,37 @@ export default function HomePage() {
 
   async function saveReelDraft() {
     if (!userId) { setNotice("Sign in to save a Reel draft."); return; }
-    if (reelDrafts.length >= 10) { setNotice("You have 10 saved drafts. Delete one before saving another."); return; }
+    if (reelDrafts.length >= 10 && !selectedDraftId) { setNotice("You have 10 saved drafts. Delete one before saving another."); return; }
     if (!mediaFile || !mediaFile.type.startsWith("video/")) { setNotice("Choose a video before saving a Reel draft."); return; }
     const allowedTypes = ["video/mp4", "video/webm", "video/quicktime"];
     if (!allowedTypes.includes(mediaFile.type)) { setNotice("Choose an MP4, WebM or MOV video."); return; }
     if (mediaFile.size > 100 * 1024 * 1024) { setNotice("Choose a video smaller than 100 MB."); return; }
     setReelDraftBusy(true);
     let uploadedPath: string | null = null;
+    const previousDraft = selectedDraftId ? reelDrafts.find(draft => draft.id === selectedDraftId) : null;
+    const previousPath = selectedDraftPath ?? previousDraft?.media_path ?? null;
     try {
       const supabase = createClient();
       const extension = mediaFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
       uploadedPath = userId + "/drafts/" + crypto.randomUUID() + "." + extension;
       const { error: uploadError } = await supabase.storage.from("zeechat-private-drafts").upload(uploadedPath, mediaFile, { contentType: mediaFile.type, cacheControl: "3600", upsert: false });
       if (uploadError) throw uploadError;
-      const { data, error } = await supabase.from("zeechat_reel_drafts").insert({ user_id: userId, caption: caption.trim(), media_path: uploadedPath, media_type: mediaFile.type, media_name: mediaFile.name, filter_name: editorFilter, zoom: editorZoom, crop_ratio: editorRatio }).select("id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at").single();
+      const draftValues = { user_id: userId, caption: caption.trim(), media_path: uploadedPath, media_type: mediaFile.type, media_name: mediaFile.name, filter_name: editorFilter, zoom: editorZoom, crop_ratio: editorRatio, updated_at: new Date().toISOString() };
+      const query = selectedDraftId
+        ? supabase.from("zeechat_reel_drafts").update(draftValues).eq("id", selectedDraftId).eq("user_id", userId)
+        : supabase.from("zeechat_reel_drafts").insert(draftValues);
+      const { data, error } = await query.select("id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at").single();
       if (error) throw error;
       setReelDrafts(current => [data as ReelDraft, ...current.filter(draft => draft.id !== data.id)].slice(0, 10));
       setSelectedDraftId(data.id); setSelectedDraftPath(uploadedPath);
-      setNotice("Reel draft saved. You can come back to it from the editor.");
+      let cleanupWarning = false;
+      if (previousPath && previousPath !== uploadedPath) {
+        const { error: cleanupError } = await supabase.storage.from("zeechat-private-drafts").remove([previousPath]);
+        cleanupWarning = Boolean(cleanupError);
+      }
+      setNotice(cleanupWarning ? "Draft saved, but the previous video needs storage cleanup." : "Reel draft saved.");
     } catch (error) {
-      if (uploadedPath) { try { await createClient().storage.from("zeechat-media").remove([uploadedPath]); } catch { /* Keep the original save error. */ } }
+      if (uploadedPath) { try { await createClient().storage.from("zeechat-private-drafts").remove([uploadedPath]); } catch { /* Keep the original save error. */ } }
       setNotice(error instanceof Error ? "Could not save Reel draft: " + error.message : "Could not save Reel draft.");
     } finally { setReelDraftBusy(false); }
   }
