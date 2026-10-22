@@ -35,7 +35,7 @@ create policy "Requesters can request private follows"
 drop policy if exists "Requesters can cancel pending follow requests" on public.zeechat_follow_requests;
 create policy "Requesters can cancel pending follow requests"
   on public.zeechat_follow_requests for delete to authenticated
-  using (auth.uid() = requester_id and status = 'pending');
+  using (auth.uid() = requester_id and status in ('pending','rejected'));
 
 create or replace function public.zeechat_respond_follow_request(p_request_id uuid, p_approve boolean)
 returns text
