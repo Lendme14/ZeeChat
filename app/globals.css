@@ -2104,3 +2104,46 @@ body {
 @keyframes reel-options-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @media(min-width:760px){.reel-options-backdrop{align-items:center}.reel-options-sheet{border-radius:24px}}
 @media(prefers-reduced-motion:reduce){.reel-options-sheet{animation:none}}
+
+
+/* Transparent, lightweight Reel comments with compact keyboard-friendly stickers. */
+.reels-view.immersive-reels .reel-comments-panel{
+  background:rgba(8,10,18,.24)!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  box-shadow:0 10px 36px rgba(0,0,0,.18)!important;
+  backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;
+}
+.reels-view.immersive-reels .reel-comments-panel>header,
+.reels-view.immersive-reels .reel-comments-panel>form{
+  background:transparent!important;border-color:rgba(255,255,255,.18)!important;
+}
+.reels-view.immersive-reels .reel-comments-panel>header b,
+.reels-view.immersive-reels .reel-comments-list article b,
+.reels-view.immersive-reels .reel-comments-list article p{
+  color:#fff!important;text-shadow:0 1px 5px rgba(0,0,0,.8)!important;
+}
+.reels-view.immersive-reels .reel-comments-list article{background:transparent!important;border-bottom:1px solid rgba(255,255,255,.09)!important}
+.reels-view.immersive-reels .reel-comments-panel form{align-items:center!important;gap:6px!important}
+.reels-view.immersive-reels .reel-comments-panel form input{
+  min-height:38px!important;padding:9px 12px!important;color:#fff!important;
+  background:rgba(255,255,255,.09)!important;border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:999px!important;backdrop-filter:blur(8px)!important;
+}
+.reels-view.immersive-reels .reel-comments-panel form input::placeholder{color:rgba(255,255,255,.72)!important}
+.reels-view.immersive-reels .reel-comments-panel form .reel-comment-sticker-toggle{
+  display:grid!important;place-items:center!important;flex:0 0 36px!important;width:36px!important;height:36px!important;
+  padding:0!important;color:#fff!important;background:rgba(255,255,255,.1)!important;
+  border:1px solid rgba(255,255,255,.18)!important;border-radius:50%!important;
+}
+.reels-view.immersive-reels .reel-comments-panel form>button[type=submit]{flex:0 0 38px!important;width:38px!important;height:38px!important;border-radius:50%!important}
+.reel-comment-sticker-tray{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:5px;
+  padding:8px 12px;background:rgba(8,10,18,.18);border-top:1px solid rgba(255,255,255,.1);
+}
+.reel-comment-sticker-tray button{
+  display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;padding:0;
+  border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.07);
+  font-size:17px;line-height:1;cursor:pointer;transition:transform .12s ease,background .12s ease;
+}
+.reel-comment-sticker-tray button:active{transform:scale(.9);background:rgba(255,255,255,.18)}
+@media(max-width:420px){.reel-comment-sticker-tray{gap:4px;padding:7px 9px}.reel-comment-sticker-tray button{flex-basis:28px;width:28px;height:28px;font-size:16px}}
