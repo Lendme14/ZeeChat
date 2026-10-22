@@ -504,12 +504,12 @@ export default function HomePage() {
           .order("created_at", { ascending: true }).limit(100);
         if (error) throw error;
         const rawRows = (data ?? []) as { id: string; user_id: string; media_url: string; media_path?: string | null; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string }[];
-        const rows = await Promise.all(rawRows.map(async story => {
-          if (!story.media_path) return story; // Older Stories remain readable while their public media migrates out.
+        const rows = (await Promise.all(rawRows.map(async story => {
+          if (!story.media_path) return story; // Legacy Stories still use their existing public media URLs.
           const secondsRemaining = Math.max(60, Math.min(86400, Math.floor((Date.parse(story.expires_at) - Date.now()) / 1000)));
           const { data: signed, error: signError } = await supabase.storage.from("zeechat-private-stories").createSignedUrl(story.media_path, secondsRemaining);
           return { ...story, media_url: signError ? "" : (signed?.signedUrl ?? "") };
-        }));
+        }))).filter(story => Boolean(story.media_url));
         const authorIds = [...new Set(rows.map(story => story.user_id))];
         const { data: authors, error: authorsError } = authorIds.length
           ? await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", authorIds)
