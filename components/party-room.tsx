@@ -112,12 +112,14 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
               const video = watchVideo.current;
-              if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; await video.play().catch(() => undefined); }
+              if (getYouTubeVideoId(watchUrlRef.current)) setYoutubeCommand({ kind: "watch-play", time: signal.time ?? 0, nonce: ++watchActionNonce.current });
+              else if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; await video.play().catch(() => undefined); }
             } else if (signal.kind === "watch-pause" && party.format === "watch") {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
               const video = watchVideo.current;
-              if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; video.pause(); }
+              if (getYouTubeVideoId(watchUrlRef.current)) setYoutubeCommand({ kind: "watch-pause", time: signal.time ?? 0, nonce: ++watchActionNonce.current });
+              else if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; video.pause(); }
             } else if (signal.kind === "watch-seek" && party.format === "watch" && typeof signal.time === "number") {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
@@ -260,7 +262,7 @@ function YouTubeWatchPlayer({ videoId, command, onAction }: { videoId: string; c
             if (latest) {
               suppressRef.current = true;
               event.target.seekTo(latest.time, true);
-              if (latest.kind === "watch-play") event.target.playVideo(); else event.target.pauseVideo();
+              if (latest.kind === "watch-play") event.target.playVideo(); else if (latest.kind === "watch-pause") event.target.pauseVideo();
               window.setTimeout(() => { suppressRef.current = false; }, 1200);
             }
           },
@@ -289,7 +291,7 @@ function YouTubeWatchPlayer({ videoId, command, onAction }: { videoId: string; c
     if (!player || !command) return;
     suppressRef.current = true;
     player.seekTo(command.time, true);
-    if (command.kind === "watch-play") player.playVideo(); else player.pauseVideo();
+    if (command.kind === "watch-play") player.playVideo(); else if (command.kind === "watch-pause") player.pauseVideo();
     const timeout = window.setTimeout(() => { suppressRef.current = false; }, 1200);
     return () => window.clearTimeout(timeout);
   }, [command]);
