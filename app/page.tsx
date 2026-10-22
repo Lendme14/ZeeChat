@@ -32,6 +32,7 @@ type PostAuthor = { username: string; display_name: string; avatar_url?: string 
 type PostComment = { id: string; post_id: string; author_id: string; body: string; created_at: string; };
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; is_private?: boolean | null; };
 type IncomingFollowRequest = { id: string; requester_id: string; created_at: string; username: string; display_name: string };
+type ReelDraft = { id: string; user_id: string; caption: string; media_path: string; media_type: string; media_name: string; filter_name: string; zoom: number; crop_ratio: string; created_at: string; updated_at: string };
 type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null; reply_to_id?: string | null };
 type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like" | "caption_vote"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
 type ZeeNotificationPreferences = { messages: boolean; follows: boolean; comments: boolean; likes: boolean; community: boolean };
@@ -128,6 +129,10 @@ export default function HomePage() {
   const [partyProfileBrowsing, setPartyProfileBrowsing] = useState(false);
   const [caption, setCaption] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [reelDrafts, setReelDrafts] = useState<ReelDraft[]>([]);
+  const [reelDraftBusy, setReelDraftBusy] = useState(false);
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [selectedDraftPath, setSelectedDraftPath] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [sounds, setSounds] = useState<ZeeSound[]>([]);
   const [selectedSound, setSelectedSound] = useState<ZeeSound | null>(null);
@@ -590,6 +595,19 @@ export default function HomePage() {
     void loadCreatorProfile();
     return () => { active = false; };
   }, [view, selectedCreatorUsername, userId]);
+
+  useEffect(() => {
+    if (!createOpen || !userId) return;
+    let active = true;
+    void (async () => {
+      try {
+        const { data, error } = await createClient().from("zeechat_reel_drafts").select("id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(10);
+        if (error) throw error;
+        if (active) setReelDrafts((data ?? []) as ReelDraft[]);
+      } catch (error) { if (active) setNotice(error instanceof Error ? "Could not load Reel drafts: " + error.message : "Could not load Reel drafts."); }
+    })();
+    return () => { active = false; };
+  }, [createOpen, userId]);
 
   useEffect(() => {
     if (!mediaFile) { setMediaPreview(null); return; }
@@ -1650,6 +1668,59 @@ export default function HomePage() {
     } finally { setStoryUploading(false); }
   }
 
+  async function saveReelDraft() {
+    if (!userId) { setNotice("Sign in to save a Reel draft."); return; }
+    if (!mediaFile || !mediaFile.type.startsWith("video/")) { setNotice("Choose a video before saving a Reel draft."); return; }
+    const allowedTypes = ["video/mp4", "video/webm", "video/quicktime"];
+    if (!allowedTypes.includes(mediaFile.type)) { setNotice("Choose an MP4, WebM or MOV video."); return; }
+    if (mediaFile.size > 100 * 1024 * 1024) { setNotice("Choose a video smaller than 100 MB."); return; }
+    setReelDraftBusy(true);
+    let uploadedPath: string | null = null;
+    try {
+      const supabase = createClient();
+      const extension = mediaFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
+      uploadedPath = userId + "/drafts/" + crypto.randomUUID() + "." + extension;
+      const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(uploadedPath, mediaFile, { contentType: mediaFile.type, cacheControl: "3600", upsert: false });
+      if (uploadError) throw uploadError;
+      const { data, error } = await supabase.from("zeechat_reel_drafts").insert({ user_id: userId, caption: caption.trim(), media_path: uploadedPath, media_type: mediaFile.type, media_name: mediaFile.name, filter_name: editorFilter, zoom: editorZoom, crop_ratio: editorRatio }).select("id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at").single();
+      if (error) throw error;
+      setReelDrafts(current => [data as ReelDraft, ...current.filter(draft => draft.id !== data.id)].slice(0, 10));
+      setSelectedDraftId(data.id); setSelectedDraftPath(uploadedPath);
+      setNotice("Reel draft saved. You can come back to it from the editor.");
+    } catch (error) {
+      if (uploadedPath) { try { await createClient().storage.from("zeechat-media").remove([uploadedPath]); } catch { /* Keep the original save error. */ } }
+      setNotice(error instanceof Error ? "Could not save Reel draft: " + error.message : "Could not save Reel draft.");
+    } finally { setReelDraftBusy(false); }
+  }
+
+  async function openReelDraft(draft: ReelDraft) {
+    if (!userId || reelDraftBusy) return;
+    setReelDraftBusy(true);
+    try {
+      const { data, error } = await createClient().storage.from("zeechat-media").download(draft.media_path);
+      if (error || !data) throw error || new Error("The saved video could not be downloaded.");
+      const file = new File([data], draft.media_name, { type: draft.media_type, lastModified: Date.now() });
+      setMediaFile(file); setCaption(draft.caption); setPostKind("reel"); setEditorFilter(draft.filter_name); setEditorZoom(Number(draft.zoom)); setEditorRatio(draft.crop_ratio); setSelectedDraftId(draft.id); setSelectedDraftPath(draft.media_path);
+      setNotice("Reel draft opened.");
+    } catch (error) { setNotice(error instanceof Error ? "Could not open Reel draft: " + error.message : "Could not open Reel draft."); }
+    finally { setReelDraftBusy(false); }
+  }
+
+  async function deleteReelDraft(draft: ReelDraft) {
+    if (!userId || reelDraftBusy) return;
+    setReelDraftBusy(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("zeechat_reel_drafts").delete().eq("id", draft.id).eq("user_id", userId);
+      if (error) throw error;
+      const { error: storageError } = await supabase.storage.from("zeechat-media").remove([draft.media_path]);
+      setReelDrafts(current => current.filter(item => item.id !== draft.id));
+      if (selectedDraftId === draft.id) { setSelectedDraftId(null); setSelectedDraftPath(null); }
+      setNotice(storageError ? "Draft deleted, but its stored video needs cleanup." : "Reel draft deleted.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not delete Reel draft."); }
+    finally { setReelDraftBusy(false); }
+  }
+
   async function publish() {
     if (!caption.trim() && !mediaFile) return;
     if (!userId) { setNotice("Sign in first to publish a post."); return; }
@@ -1710,6 +1781,14 @@ export default function HomePage() {
       const { data: createdPost, error } = await supabase.from("zeechat_posts").insert({ author_id: userId, caption: caption.trim(), post_type: makeReel ? "reel" : publishedType, is_reel: makeReel, sound_id: soundId, media_url: mediaUrl, thumbnail_url: thumbnailUrl, visibility: "public" }).select("id").single();
       if (error) throw error;
       postInserted = true;
+      if (selectedDraftId) {
+        try {
+          const { error: draftDeleteError } = await supabase.from("zeechat_reel_drafts").delete().eq("id", selectedDraftId).eq("user_id", userId);
+          if (!draftDeleteError && selectedDraftPath) await supabase.storage.from("zeechat-media").remove([selectedDraftPath]);
+          setReelDrafts(current => current.filter(draft => draft.id !== selectedDraftId));
+        } catch (draftCleanupError) { console.warn("Published Reel, but draft cleanup failed", draftCleanupError); }
+      }
+      setSelectedDraftId(null); setSelectedDraftPath(null);
       setUploadProgress(null); setUploadLabel("");
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       setPendingUploadPost(current => current?.id === pendingId ? null : current);
@@ -1829,13 +1908,13 @@ export default function HomePage() {
     {partyCreateOpen && <div className="modal-backdrop" onClick={() => !partySubmitting && setPartyCreateOpen(false)}><section className="create-modal party-create-modal" role="dialog" aria-modal="true" aria-labelledby="party-create-title" onClick={event => event.stopPropagation()}><button className="modal-close" onClick={() => !partySubmitting && setPartyCreateOpen(false)} aria-label="Close party setup" disabled={partySubmitting}>×</button><span className="eyebrow">MAKE IT A MOMENT</span><h2 id="party-create-title">Create your <em>party.</em></h2><p>Publish a public community event or keep a private listing for yourself. Choose when it starts and let guests RSVP.</p><form onSubmit={event => void createParty(event)}><label>Party name<input value={partyName} onChange={event => setPartyName(event.target.value)} minLength={3} maxLength={70} placeholder="e.g. Friday Night Hangout" required /></label><label>What’s the vibe?<textarea value={partyDescription} onChange={event => setPartyDescription(event.target.value)} maxLength={240} placeholder="Tell people what to expect…" /></label><div className="party-form-label">Give your party a cover</div><div className="party-thumbnail-upload">{partyThumbnailPreview ? <img src={partyThumbnailPreview} alt="Party thumbnail preview" /> : <div className="party-thumbnail-placeholder" style={{ background: "linear-gradient(135deg, " + (partyStickerOptions.find(item => item.id === partyStickerId)?.colors[0] ?? "#312e81") + ", " + (partyStickerOptions.find(item => item.id === partyStickerId)?.colors[1] ?? "#c026d3") + ")" }}><span>{partyStickerOptions.find(item => item.id === partyStickerId)?.emoji ?? "🌌"}</span><small>YOUR PARTY COVER</small></div>}<label className="party-thumbnail-pick"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event => { const file = event.target.files?.[0] ?? null; if (!file) return; if (file.size > 8 * 1024 * 1024) { setNotice("Choose an image under 8 MB."); event.currentTarget.value = ""; return; } if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) { setNotice("Choose a JPG, PNG, WebP, or GIF image."); event.currentTarget.value = ""; return; } setPartyThumbnailFile(file); setPartyThumbnailPreview(URL.createObjectURL(file)); }} /><span>＋ Upload thumbnail</span></label>{partyThumbnailPreview && <button type="button" className="party-thumbnail-remove" onClick={() => { setPartyThumbnailFile(null); setPartyThumbnailPreview(null); }}>Remove image</button>}</div><div className="party-form-label">Or choose a party sticker</div><div className="party-sticker-box" role="group" aria-label="Choose a party sticker">{partyStickerOptions.map(sticker => <button key={sticker.id} type="button" className={"party-sticker-option " + (partyStickerId === sticker.id ? "selected" : "")} onClick={() => setPartyStickerId(sticker.id)} aria-pressed={partyStickerId === sticker.id} style={{ background: "linear-gradient(145deg, " + sticker.colors[0] + ", " + sticker.colors[1] + ")" }}><span>{sticker.emoji}</span><small>{sticker.label}</small>{partyStickerId === sticker.id && <i>✓</i>}</button>)}</div><label>Start date and time<input type="datetime-local" value={partyScheduledAt} min={localDateTimeInput(new Date(Date.now() + 5 * 60 * 1000))} onChange={event => setPartyScheduledAt(event.target.value)} required /></label><div className="party-form-label">Choose a format</div><div className="party-format-options"><button type="button" className={partyFormat === "video" ? "selected" : ""} onClick={() => setPartyFormat("video")}><Video size={19}/><b>Video</b><small>Face-to-face hangout</small></button><button type="button" className={partyFormat === "audio" ? "selected" : ""} onClick={() => setPartyFormat("audio")}><Mic size={19}/><b>Audio</b><small>Talk it out</small></button><button type="button" className={partyFormat === "watch" ? "selected" : ""} onClick={() => setPartyFormat("watch")}><Film size={19}/><b>Watch</b><small>Watch together</small></button></div><div className="party-form-label">Who can discover it?</div><div className="party-access-options"><button type="button" className={partyAccess === "public" ? "selected" : ""} onClick={() => setPartyAccess("public")}><Users size={18}/><span><b>Public</b><small>Discoverable and open for RSVP</small></span></button><button type="button" className={partyAccess === "private" ? "selected" : ""} onClick={() => setPartyAccess("private")}><LockKeyhole size={18}/><span><b>Private</b><small>Hidden from the public party list</small></span></button></div><div className="modal-footer"><small>{partyName.length}/70</small><button className="create-button" type="submit" disabled={partySubmitting || partyName.trim().length < 3 || !partyScheduledAt}>{partySubmitting ? "Publishing…" : "Publish party ↗"}</button></div></form></section></div>}
     {editProfileOpen && <div className="modal-backdrop" onClick={() => setEditProfileOpen(false)}><section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setEditProfileOpen(false)}>×</button><span className="eyebrow">MAKE IT YOURS</span><h2 id="edit-profile-title">Edit your <em>profile.</em></h2><form onSubmit={event => { event.preventDefault(); void saveProfile(); }}><label>Username<input value={usernameDraft} onChange={event => setUsernameDraft(event.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))} maxLength={24} minLength={3} required /><small>3–24 characters · letters, numbers, dots and underscores</small></label><label>Display name<input value={displayNameDraft} onChange={event => setDisplayNameDraft(event.target.value)} maxLength={60} required /></label><label>Bio<textarea value={bioDraft} onChange={event => setBioDraft(event.target.value)} maxLength={300} placeholder="A little about you…" /></label><label className="profile-privacy-setting"><span><b>Private account</b><small>Only approved followers can follow your private account.</small></span><input type="checkbox" checked={privacyDraft} onChange={event => setPrivacyDraft(event.target.checked)} /></label>{privacyDraft && <section className="follow-request-panel"><h3>Follow requests <span>{incomingFollowRequests.length}</span></h3>{incomingFollowRequests.length === 0 ? <p>No pending requests.</p> : incomingFollowRequests.map(request => <div className="follow-request-row" key={request.id}><div><b>{request.display_name}</b><small>@{request.username}</small></div><button type="button" className="outline-button" disabled={followRequestBusyId === request.id} onClick={() => void respondToFollowRequest(request.id, false)}>Decline</button><button type="button" className="create-button" disabled={followRequestBusyId === request.id} onClick={() => void respondToFollowRequest(request.id, true)}>{followRequestBusyId === request.id ? "Saving…" : "Approve"}</button></div>)}</section>}<div className="modal-footer"><small>{bioDraft.length}/300</small><button className="create-button" type="submit" disabled={profileSaving || !displayNameDraft.trim() || !usernameDraft.trim()}>{profileSaving ? "Saving…" : "Save profile ↗"}</button></div></form></section></div>}
     {createOpen && <div className="modal-backdrop" onClick={() => setCreateOpen(false)}><section className="create-modal media-editor-modal" role="dialog" aria-modal="true" aria-labelledby="create-title" onClick={e=>e.stopPropagation()}><button className="modal-close" type="button" onClick={()=>setCreateOpen(false)}>×</button><span className="eyebrow">ZEECHAT CREATOR STUDIO</span><h2 id="create-title">{mediaFile?.type.startsWith("video/")?"Make your Reel":"Create your post"}</h2><p className="editor-intro">Choose media, tune the look, crop it, add a sound, then share.</p>
-<input ref={mediaPickerRef} className="editor-file-input" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" disabled={busy} onChange={e=>{const file=e.currentTarget.files?.[0]??null;e.currentTarget.value="";if(!file)return;const video=file.type.startsWith("video/");const allowed=video?["video/mp4","video/webm","video/quicktime"]:["image/jpeg","image/png","image/webp","image/gif"];const limit=video?100*1024*1024:8*1024*1024;if(!allowed.includes(file.type)||file.size>limit){setNotice(video?"Choose an MP4, WebM or MOV video smaller than 100 MB.":"Choose a JPG, PNG, WebP or GIF photo smaller than 8 MB.");return;}setMediaFile(file);setPostKind(video?"reel":"post");setEditorFilter("none");setEditorZoom(1);setEditorRatio("original");setSelectedSound(null);setAudioFile(null);}} />
+<input ref={mediaPickerRef} className="editor-file-input" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" disabled={busy} onChange={e=>{const file=e.currentTarget.files?.[0]??null;e.currentTarget.value="";if(!file)return;const video=file.type.startsWith("video/");const allowed=video?["video/mp4","video/webm","video/quicktime"]:["image/jpeg","image/png","image/webp","image/gif"];const limit=video?100*1024*1024:8*1024*1024;if(!allowed.includes(file.type)||file.size>limit){setNotice(video?"Choose an MP4, WebM or MOV video smaller than 100 MB.":"Choose a JPG, PNG, WebP or GIF photo smaller than 8 MB.");return;}setMediaFile(file);setPostKind(video?"reel":"post");setEditorFilter("none");setEditorZoom(1);setEditorRatio("original");setSelectedSound(null);setAudioFile(null);setSelectedDraftId(null);setSelectedDraftPath(null);}} />
 {!mediaFile?<button type="button" className="editor-gallery-pick" onClick={()=>mediaPickerRef.current?.click()}><span>＋</span><b>Choose from gallery</b><small>Photos go to Home · Videos go to Reels</small></button>:<div className="editor-preview-wrap"><div className={"editor-preview editor-ratio-"+editorRatio}><button type="button" className="editor-change-media" onClick={()=>mediaPickerRef.current?.click()}>Change media</button>{mediaPreview&&(mediaFile.type.startsWith("video/")?<video src={mediaPreview} controls playsInline style={{filter:editorFilterCss,transform:"scale("+editorZoom+")"}}/>:<Image src={mediaPreview} alt="Media preview" width={720} height={900} unoptimized style={{filter:editorFilterCss,transform:"scale("+editorZoom+")"}}/>)}{uploadProgress!==null&&<div className="editor-upload-overlay"><div className="upload-progress-ring" style={{background:"conic-gradient(#45d6a0 "+(uploadProgress*3.6)+"deg,#263a33 0deg)"}}><span>{uploadProgress}%</span></div><b>{uploadLabel||"Publishing…"}</b></div>}</div>
 <div className="editor-tool-block"><b>Filters</b><div className="editor-filter-row">{[{id:"none",label:"Original"},{id:"warm",label:"Warm"},{id:"mono",label:"B&W"},{id:"vivid",label:"Vivid"},{id:"cool",label:"Cool"},{id:"fade",label:"Soft"}].map(item=><button type="button" key={item.id} className={editorFilter===item.id?"selected":""} onClick={()=>setEditorFilter(item.id)}>{item.label}</button>)}</div></div>
 <div className="editor-controls-grid"><label>Crop ratio<select value={editorRatio} onChange={e=>setEditorRatio(e.target.value)}><option value="original">Original</option><option value="square">Square 1:1</option><option value="portrait">Portrait 4:5</option><option value="story">Story / Reel 9:16</option></select></label><label>Zoom crop · {Math.round(editorZoom*100)}%<input type="range" min="1" max="2.5" step=".05" value={editorZoom} onChange={e=>setEditorZoom(Number(e.target.value))}/></label></div></div>}
 <label className="composer-field-label" htmlFor="post-caption">Caption</label><textarea id="post-caption" value={caption} onChange={e=>setCaption(e.target.value)} maxLength={2200} placeholder="Write something…" disabled={busy}/>
 <div className="editor-sound-row"><label>Sound library<select value={selectedSound?.id??""} onChange={e=>{const found=sounds.find(sound=>sound.id===e.target.value)??null;setSelectedSound(found);setAudioFile(null);}} disabled={busy}><option value="">No library sound</option>{sounds.map(sound=><option key={sound.id} value={sound.id}>{sound.title}</option>)}</select></label><label className="editor-audio-pick">Or add audio<input type="file" accept="audio/*" disabled={busy||Boolean(selectedSound)} onChange={e=>{const file=e.currentTarget.files?.[0]??null;e.currentTarget.value="";if(file&&!file.type.startsWith("audio/")){setNotice("Choose an audio file.");return;}if(file&&file.size>25*1024*1024){setNotice("Choose audio smaller than 25 MB.");return;}setAudioFile(file);setSelectedSound(null);}}/></label>{(selectedSound||audioFile)&&<button type="button" className="editor-remove-sound" onClick={()=>{setSelectedSound(null);setAudioFile(null);}}>Remove sound</button>}</div>
 {mediaFile&&<p className="editor-media-meta">{mediaFile.name} · {mediaFile.type.startsWith("video/")?"Video → Reel":"Photo → Home"}</p>}
-<div className="modal-footer"><small>{caption.length}/2200</small><button type="button" className="create-button" disabled={busy||(!caption.trim()&&!mediaFile)} onClick={()=>void publish()}>{busy?(uploadLabel||"Publishing…"):"Share post ↗"}</button></div></section></div>}
+{mediaFile?.type.startsWith("video/") && <div className="reel-drafts-panel"><div className="reel-drafts-heading"><b>Reel drafts</b><small>{reelDrafts.length}/10 saved</small></div>{reelDrafts.length === 0 ? <p>Save a video draft to finish it later.</p> : reelDrafts.map(draft => <div className="reel-draft-row" key={draft.id}><div><b>{draft.caption.trim() || "Untitled Reel"}</b><small>{new Date(draft.updated_at).toLocaleDateString()} · Video draft</small></div><button type="button" className="outline-button" disabled={reelDraftBusy || busy} onClick={() => void openReelDraft(draft)}>Open</button><button type="button" className="outline-button" disabled={reelDraftBusy || busy} onClick={() => void deleteReelDraft(draft)}>Delete</button></div>)}</div>}<div className="modal-footer"><small>{caption.length}/2200</small>{mediaFile?.type.startsWith("video/") && <button type="button" className="outline-button" disabled={busy||reelDraftBusy} onClick={()=>void saveReelDraft()}>{reelDraftBusy?"Saving…":"Save draft"}</button>}<button type="button" className="create-button" disabled={busy||reelDraftBusy||(!caption.trim()&&!mediaFile)} onClick={()=>void publish()}>{busy?(uploadLabel||"Publishing…"):"Share post ↗"}</button></div></section></div>}
   </main>;
 }
