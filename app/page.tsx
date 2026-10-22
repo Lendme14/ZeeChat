@@ -919,8 +919,8 @@ export default function HomePage() {
       const supabase = createClient();
       const pattern = `%${query}%`;
       const [byUsername, byName] = await Promise.all([
-        supabase.from("zeechat_profiles").select("user_id,username,display_name,bio,avatar_url,cover_url").eq("is_private", false).ilike("username", pattern).limit(20),
-        supabase.from("zeechat_profiles").select("user_id,username,display_name,bio,avatar_url,cover_url").eq("is_private", false).ilike("display_name", pattern).limit(20)
+        supabase.from("zeechat_profiles").select("user_id,username,display_name,bio,avatar_url,cover_url,is_private").ilike("username", pattern).limit(20),
+        supabase.from("zeechat_profiles").select("user_id,username,display_name,bio,avatar_url,cover_url,is_private").ilike("display_name", pattern).limit(20)
       ]);
       if (byUsername.error) throw byUsername.error;
       if (byName.error) throw byName.error;
