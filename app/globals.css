@@ -1569,3 +1569,31 @@ body {
  .party-capability-note{padding-bottom:10px}
 }
 @media(prefers-reduced-motion:reduce){.party-mode-switch button{transition:none}}
+
+
+/* Live ZeeChat party room */
+.party-room-overlay{position:fixed;inset:0;z-index:1200;background:rgba(7,8,14,.97);color:#f8f7ff;display:flex;flex-direction:column;padding:clamp(16px,3vw,34px);overflow:auto}
+.party-room-header{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:1200px;width:100%;margin:0 auto 20px}
+.party-room-header h2{font-size:clamp(22px,3vw,34px);margin:8px 0 5px;letter-spacing:-.04em}
+.party-room-header p{display:flex;align-items:center;gap:7px;margin:0;color:#b9b8c8;font-size:13px}
+.party-room-live{display:inline-flex;align-items:center;gap:6px;color:#ff7889;font-size:11px;font-weight:800;letter-spacing:.14em}
+.party-room-leave{display:flex;align-items:center;gap:8px;border:1px solid #4b2633;background:#3a1723;color:#ffb9c4;border-radius:999px;padding:11px 16px;font-weight:700;cursor:pointer}
+.party-room-stage{width:100%;max-width:1200px;margin:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px;align-content:center}
+.party-room-tile{position:relative;min-height:240px;aspect-ratio:4/3;background:linear-gradient(145deg,#24243a,#12121e);border:1px solid #343448;border-radius:22px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.party-room-tile video{width:100%;height:100%;position:absolute;inset:0;object-fit:cover}
+.party-room-tile video.camera-disabled{opacity:0}
+.party-room-tile>span{position:absolute;left:14px;bottom:13px;background:#111827c9;padding:7px 10px;border-radius:9px;font-size:12px;font-weight:700;z-index:2}
+.party-room-avatar{position:absolute;display:grid;place-items:center;width:82px;height:82px;border-radius:50%;background:linear-gradient(135deg,#a78bfa,#ec4899);font-size:21px;font-weight:800}
+.party-room-waiting{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:#d7d4e7;background:#11111c;border:1px dashed #414057;border-radius:22px;padding:24px}
+.party-room-waiting p{color:#aaa8bd;margin:0;font-size:13px}
+.party-spin{animation:party-spin 1.1s linear infinite}
+@keyframes party-spin{to{transform:rotate(360deg)}}
+.party-room-controls{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;padding:22px 0 8px}
+.party-room-controls button{display:flex;align-items:center;justify-content:center;gap:9px;min-width:116px;border:1px solid #37374a;border-radius:14px;background:#1b1b2b;color:#f7f5ff;padding:13px 17px;font-weight:700;cursor:pointer}
+.party-room-controls button.is-off{background:#3b2530;border-color:#754051;color:#ffb8c5}
+.party-room-controls button.party-room-end{background:#c82d4b;border-color:#c82d4b}
+.party-room-footnote{text-align:center;color:#8e8da4;font-size:11px;margin:12px 0 0}
+.party-room-error{max-width:560px;margin:auto;text-align:center;padding:30px;border:1px solid #493142;background:#19121e;border-radius:22px}
+.party-room-error p{color:#c4bfd1;line-height:1.6}
+.party-room-error button{border:0;border-radius:12px;background:#8b5cf6;color:white;padding:11px 16px;font-weight:700;cursor:pointer}
+@media(max-width:600px){.party-room-overlay{padding:14px}.party-room-header{align-items:flex-start}.party-room-header p{font-size:11px}.party-room-stage{grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}.party-room-tile{min-height:165px;border-radius:15px}.party-room-controls{gap:8px}.party-room-controls button{min-width:90px;padding:11px 12px}.party-room-controls button span{font-size:12px}}
