@@ -5,7 +5,11 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Radio, LoaderCircle } fr
 import { createClient } from "@/lib/supabase/client";
 
 type PartyRoomInfo = { id: string; title: string; format: "video" | "audio" | "watch"; host_id: string };
+type WatchAction = { kind: "watch-play" | "watch-pause" | "watch-seek"; time: number; nonce: number };
 type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-source" | "watch-play" | "watch-pause" | "watch-seek"; from: string; to?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit; url?: string; time?: number };
+type YTPlayer = { playVideo: () => void; pauseVideo: () => void; seekTo: (seconds: number, allowSeekAhead: boolean) => void; getCurrentTime: () => number; destroy: () => void };
+type YTApi = { Player: new (element: HTMLElement, options: { videoId: string; playerVars?: Record<string, number>; events: { onReady: (event: { target: YTPlayer }) => void; onStateChange: (event: { data: number; target: YTPlayer }) => void } }) => YTPlayer };
+declare global { interface Window { YT?: YTApi; onYouTubeIframeAPIReady?: () => void } }
 
 function getYouTubeVideoId(value: string): string | null {
   try {
@@ -39,6 +43,8 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [watchUrl, setWatchUrl] = useState("");
   const [watchUrlDraft, setWatchUrlDraft] = useState("");
   const [watchError, setWatchError] = useState("");
+  const [youtubeCommand, setYoutubeCommand] = useState<WatchAction | null>(null);
+  const watchActionNonce = useRef(0);
 
   const send = useCallback((signal: Signal) => {
     const channel = channelRef.current;
@@ -115,7 +121,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
             } else if (signal.kind === "watch-seek" && party.format === "watch" && typeof signal.time === "number") {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
-              if (watchVideo.current) watchVideo.current.currentTime = signal.time;
+              if (getYouTubeVideoId(watchUrlRef.current)) setYoutubeCommand({ kind: "watch-seek", time: signal.time, nonce: ++watchActionNonce.current });\n              else if (watchVideo.current) watchVideo.current.currentTime = signal.time;
             } else if (signal.kind === "hello") {
               setParticipants(current => current.includes(signal.from) ? current : [...current, signal.from]);
               if (party.format === "watch" && watchUrlRef.current) {
@@ -215,7 +221,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
 
   return <section className="party-room-overlay" role="dialog" aria-modal="true" aria-label={party.title}>
     <header className="party-room-header"><div><span className="party-room-live"><Radio size={13}/> LIVE ROOM</span><h2>{party.title}</h2><p><Users size={14}/> {participants.length + 1} connected · {party.format === "audio" ? "Audio party" : party.format === "watch" ? "Watch party room" : "Video party"}</p></div><button type="button" className="party-room-leave" onClick={leave}><PhoneOff size={17}/> Leave</button></header>
-    {error ? <div className="party-room-error"><b>{connecting ? "Couldn’t join the room" : "Something needs attention"}</b><p>{error}</p><button type="button" onClick={() => setError("")}>Dismiss</button><button type="button" onClick={leave}>Back to parties</button></div> : <>{party.format === "watch" && <section className="party-watch-panel"><form className="party-watch-source" onSubmit={setWatchSource}><label htmlFor="party-watch-url">Video URL</label><input id="party-watch-url" type="url" value={watchUrlDraft} onChange={event => setWatchUrlDraft(event.target.value)} placeholder="YouTube link or direct MP4/WebM URL" maxLength={2000} /><button type="submit">Share video</button></form>{watchError && <p className="party-watch-error" role="alert">{watchError}</p>}{watchUrl ? (getYouTubeVideoId(watchUrl) ? <div className="party-watch-embed"><iframe className="party-watch-player party-watch-iframe" src={`https://www.youtube-nocookie.com/embed/${getYouTubeVideoId(watchUrl)}?playsinline=1&rel=0`} title="YouTube watch party video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div> : <video ref={watchVideo} className="party-watch-player" src={watchUrl} controls playsInline onPlay={() => broadcastWatchAction("watch-play")} onPause={() => broadcastWatchAction("watch-pause")} onSeeked={() => broadcastWatchAction("watch-seek")} />) : <div className="party-watch-empty"><b>Choose a video to watch together</b><p>Paste a YouTube watch/share link, or a direct MP4/WebM video URL.</p></div>}</section>}<div className={"party-room-stage " + (party.format === "audio" || party.format === "watch" ? "audio-stage" : "")}>
+    {error ? <div className="party-room-error"><b>{connecting ? "Couldn’t join the room" : "Something needs attention"}</b><p>{error}</p><button type="button" onClick={() => setError("")}>Dismiss</button><button type="button" onClick={leave}>Back to parties</button></div> : <>{party.format === "watch" && <section className="party-watch-panel"><form className="party-watch-source" onSubmit={setWatchSource}><label htmlFor="party-watch-url">Video URL</label><input id="party-watch-url" type="url" value={watchUrlDraft} onChange={event => setWatchUrlDraft(event.target.value)} placeholder="YouTube link or direct MP4/WebM URL" maxLength={2000} /><button type="submit">Share video</button></form>{watchError && <p className="party-watch-error" role="alert">{watchError}</p>}{watchUrl ? (getYouTubeVideoId(watchUrl) ? <YouTubeWatchPlayer key={getYouTubeVideoId(watchUrl)!} videoId={getYouTubeVideoId(watchUrl)!} command={youtubeCommand} onAction={(kind, time) => send({ kind, from: userId, time })} /> : <video ref={watchVideo} className="party-watch-player" src={watchUrl} controls playsInline onPlay={() => broadcastWatchAction("watch-play")} onPause={() => broadcastWatchAction("watch-pause")} onSeeked={() => broadcastWatchAction("watch-seek")} />) : <div className="party-watch-empty"><b>Choose a video to watch together</b><p>Paste a YouTube watch/share link, or a direct MP4/WebM video URL.</p></div>}</section>}<div className={"party-room-stage " + (party.format === "audio" || party.format === "watch" ? "audio-stage" : "")}>
       <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">You</div>}<span>You {party.host_id === userId ? "· Host" : ""}</span></article>
       {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} audioOnly={party.format === "audio"}/>)}
       {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : party.format === "watch" ? <><Users size={28}/><b>Watch party is ready</b><p>Share a video link above and everyone can watch together.</p></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
@@ -228,4 +234,64 @@ function RemoteTile({ userId, stream, audioOnly }: { userId: string; stream: Med
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, [stream]);
   return <article className="party-room-tile"><video ref={videoRef} autoPlay playsInline className={audioOnly ? "camera-disabled" : ""}/>{audioOnly && <div className="party-room-avatar">{userId.slice(0, 2).toUpperCase()}</div>}<span>Guest {userId.slice(0, 5)}</span></article>;
+}
+
+
+function YouTubeWatchPlayer({ videoId, command, onAction }: { videoId: string; command: WatchAction | null; onAction: (kind: WatchAction["kind"], time: number) => void }) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const suppressRef = useRef(false);
+  const latestCommandRef = useRef<WatchAction | null>(command);
+  const onActionRef = useRef(onAction);
+  useEffect(() => { latestCommandRef.current = command; }, [command]);
+  useEffect(() => { onActionRef.current = onAction; }, [onAction]);
+  useEffect(() => {
+    let disposed = false;
+    let player: YTPlayer | null = null;
+    const createPlayer = () => {
+      if (disposed || !mountRef.current || !window.YT?.Player) return;
+      player = new window.YT.Player(mountRef.current, {
+        videoId,
+        playerVars: { playsinline: 1, rel: 0, origin: window.location.origin },
+        events: {
+          onReady: event => {
+            playerRef.current = event.target;
+            const latest = latestCommandRef.current;
+            if (latest) {
+              suppressRef.current = true;
+              event.target.seekTo(latest.time, true);
+              if (latest.kind === "watch-play") event.target.playVideo(); else event.target.pauseVideo();
+              window.setTimeout(() => { suppressRef.current = false; }, 1200);
+            }
+          },
+          onStateChange: event => {
+            if (suppressRef.current) return;
+            const time = event.target.getCurrentTime();
+            if (event.data === 1) onActionRef.current("watch-play", time);
+            else if (event.data === 2) onActionRef.current("watch-pause", time);
+            else if (event.data === 3) onActionRef.current("watch-seek", time);
+          }
+        }
+      });
+      playerRef.current = player;
+    };
+    if (window.YT?.Player) createPlayer();
+    else {
+      const existing = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]');
+      if (!existing) { const script = document.createElement("script"); script.src = "https://www.youtube.com/iframe_api"; script.async = true; document.head.appendChild(script); }
+      const previous = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { previous?.(); createPlayer(); };
+    }
+    return () => { disposed = true; playerRef.current = null; player?.destroy(); };
+  }, [videoId]);
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !command) return;
+    suppressRef.current = true;
+    player.seekTo(command.time, true);
+    if (command.kind === "watch-play") player.playVideo(); else player.pauseVideo();
+    const timeout = window.setTimeout(() => { suppressRef.current = false; }, 1200);
+    return () => window.clearTimeout(timeout);
+  }, [command]);
+  return <div className="party-watch-embed"><div ref={mountRef} className="party-watch-player party-watch-iframe" /></div>;
 }
