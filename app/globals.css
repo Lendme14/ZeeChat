@@ -2010,3 +2010,75 @@ body {
    gap:16px!important;
  }
 }
+
+
+/* Reel playback refinements: preserve source framing and keep UI geometry independent. */
+.reels-view.immersive-reels .reel-player{
+  contain:layout paint!important;
+  isolation:isolate!important;
+}
+.reels-view.immersive-reels .reel-player>.live-reel-video{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;
+  object-fit:contain!important;object-position:center center!important;
+  aspect-ratio:auto!important;border-radius:0!important;background:#050609!important;
+}
+/* Keep every overlay anchored to the viewport/stage, never sized by the media's intrinsic ratio. */
+.reels-view.immersive-reels .reel-player>.immersive-reel-header{
+  position:absolute!important;top:calc(env(safe-area-inset-top,0px) + 10px)!important;
+  left:12px!important;right:12px!important;width:auto!important;height:auto!important;
+  flex:0 0 auto!important;transform:none!important;
+}
+.reels-view.immersive-reels .reel-player>.reel-caption{
+  position:absolute!important;left:14px!important;right:70px!important;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 22px)!important;
+  width:auto!important;max-width:none!important;flex:none!important;transform:none!important;
+}
+.reels-view.immersive-reels .reel-player>.reel-actions{
+  position:absolute!important;left:auto!important;right:8px!important;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 22px)!important;
+  width:48px!important;min-width:48px!important;max-width:48px!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;
+  flex:0 0 48px!important;transform:none!important;
+}
+.reels-view.immersive-reels .reel-player>.sound-button{
+  position:absolute!important;top:calc(env(safe-area-inset-top,0px) + 60px)!important;
+  right:14px!important;width:36px!important;height:36px!important;min-width:36px!important;
+  flex:0 0 36px!important;transform:none!important;
+}
+.reels-view.immersive-reels .reel-player>.reel-video-controls{
+  position:absolute!important;left:12px!important;right:70px!important;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 8px)!important;top:auto!important;
+  width:auto!important;max-width:none!important;min-width:0!important;height:auto!important;
+  margin:0!important;flex:none!important;transform:none!important;
+  opacity:1;visibility:visible;pointer-events:auto;
+  transition:opacity .22s ease,visibility .22s ease!important;
+}
+.reels-view.immersive-reels .reel-player>.reel-video-controls.controls-hidden{
+  opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+}
+.reels-view.immersive-reels .reel-player>.reel-video-controls.controls-visible{
+  opacity:1!important;visibility:visible!important;pointer-events:auto!important;
+}
+.reels-view.immersive-reels .reel-scrubber-row{
+  display:flex!important;align-items:center!important;gap:8px!important;width:100%!important;
+}
+.reels-view.immersive-reels .reel-scrubber{
+  flex:1 1 auto!important;width:100%!important;min-width:0!important;
+}
+@media(min-width:760px){
+ .reels-view.immersive-reels .reel-player>.live-reel-video{object-fit:contain!important;border-radius:24px!important}
+ .reels-view.immersive-reels .reel-player>.immersive-reel-header{left:12px!important;right:12px!important}
+ .reels-view.immersive-reels .reel-player>.reel-caption{left:16px!important;right:66px!important;bottom:18px!important}
+ .reels-view.immersive-reels .reel-player>.reel-actions{right:-76px!important;bottom:24px!important;width:48px!important;max-width:48px!important}
+ .reels-view.immersive-reels .reel-player>.reel-video-controls{left:12px!important;right:62px!important;bottom:8px!important}
+}
+@media(max-width:759px){
+ .reels-view.immersive-reels .reel-player{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;border:0!important;border-radius:0!important}
+ .reels-view.immersive-reels .reel-player>.live-reel-video{object-fit:contain!important;border-radius:0!important}
+ .reels-view.immersive-reels .reel-player>.reel-video-controls{left:10px!important;right:64px!important;bottom:calc(env(safe-area-inset-bottom,0px) + 10px)!important}
+}
+@media(prefers-reduced-motion:reduce){
+ .reels-view.immersive-reels .reel-video-controls{transition:none!important}
+}
