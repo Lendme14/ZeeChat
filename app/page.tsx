@@ -297,9 +297,9 @@ export default function HomePage() {
     } finally { setPartySubmitting(false); }
   }
 
-  async function togglePartyMembership(party: PartyEntry) {
-    if (!userId) { setNotice("Sign in to join a party or RSVP."); return; }
-    if (party.host_id === userId) { setNotice("You’re hosting this party."); return; }
+  async function togglePartyMembership(party: PartyEntry): Promise<boolean> {
+    if (!userId) { setNotice("Sign in to join a party or RSVP."); return false; }
+    if (party.host_id === userId) { setNotice("You’re hosting this party."); return false; }
     setPartyBusyIds(current => [...current, party.id]);
     try {
       const supabase = createClient();
@@ -314,23 +314,27 @@ export default function HomePage() {
         if (error && error.code !== "23505") throw error;
         setPartyJoinedIds(current => current.includes(party.id) ? current : [...current, party.id]);
         setPartyEntries(current => current.map(item => item.id === party.id ? { ...item, participant_count: item.participant_count + (error ? 0 : 1) } : item));
-        setNotice(party.status === "live" ? "You’re on the guest list. Live audio/video calling isn’t connected yet." : "You’re going! Your RSVP is saved.");
+        setNotice(party.status === "live" ? "You’re on the guest list. Enter the room to connect live." : "You’re going! Your RSVP is saved.");
       }
+      return true;
     } catch (error) {
       setNotice(error instanceof Error ? "Couldn’t update your RSVP: " + error.message : "Couldn’t update your RSVP. Please try again.");
+      return false;
     } finally { setPartyBusyIds(current => current.filter(id => id !== party.id)); }
   }
 
-  async function updatePartyStatus(party: PartyEntry, status: "live" | "ended") {
-    if (!userId || party.host_id !== userId) return;
+  async function updatePartyStatus(party: PartyEntry, status: "live" | "ended"): Promise<boolean> {
+    if (!userId || party.host_id !== userId) return false;
     setPartyBusyIds(current => [...current, party.id]);
     try {
       const { error } = await createClient().from("zeechat_parties").update({ status, updated_at: new Date().toISOString() }).eq("id", party.id).eq("host_id", userId);
       if (error) throw error;
       await loadParties();
-      setNotice(status === "live" ? "Party marked live. Guests can now find and join the listing." : "Party ended and removed from discovery.");
+      setNotice(status === "live" ? "Party is live. Guests can now enter the room." : "Party ended and removed from discovery.");
+      return true;
     } catch (error) {
       setNotice(error instanceof Error ? "Couldn’t update your party: " + error.message : "Couldn’t update your party.");
+      return false;
     } finally { setPartyBusyIds(current => current.filter(id => id !== party.id)); }
   }
 
@@ -1374,7 +1378,7 @@ export default function HomePage() {
             {partyEntries.filter(p => p.status === "live" && (partyFilter === "all" || partyFilter === "live" || partyFilter === "mine") && (partyFilter !== "mine" || p.host_id === userId)).map((party, index) => <article key={party.id} className={"party-live-card " + (["party-card-violet","party-card-cyan","party-card-rose"][index % 3])}>
               <div className="party-card-top"><span className="party-live-pill"><i/> LIVE NOW</span><span className="party-lock"><Users size={14}/> {party.participant_count}</span></div>
               <div className="party-card-content"><div className="party-host-avatar">{(party.hostName[0] || "Z").toUpperCase()}</div><small>@{party.hostUsername} · {party.host_id === userId ? "YOU HOST" : "HOST"}</small><h3>{party.title}</h3><p>{party.description || (party.format === "audio" ? "An audio hangout with the community." : party.format === "watch" ? "A community watch party." : "Come hang out with the community.")}</p><div className="party-card-actions">
-                {party.host_id === userId ? <><button type="button" onClick={() => setActivePartyRoom(party)}><Video size={15}/> Enter room ↗</button><button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => void updatePartyStatus(party,"ended")}>End party <span>×</span></button></> : <><button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => { if (partyJoinedIds.includes(party.id)) setActivePartyRoom(party); else void togglePartyMembership(party).then(() => setActivePartyRoom(party)); }}>{partyBusyIds.includes(party.id) ? "Saving…" : partyJoinedIds.includes(party.id) ? "Join room" : "Join & enter"} <span>↗</span></button>{partyJoinedIds.includes(party.id) && <button type="button" className="party-cancel-rsvp" disabled={partyBusyIds.includes(party.id)} onClick={() => void togglePartyMembership(party)}>Leave</button>}</>}
+                {party.host_id === userId ? <><button type="button" onClick={() => setActivePartyRoom(party)}><Video size={15}/> Enter room ↗</button><button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => void updatePartyStatus(party,"ended")}>End party <span>×</span></button></> : <><button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => { if (partyJoinedIds.includes(party.id)) setActivePartyRoom(party); else void togglePartyMembership(party).then(joined => { if (joined) setActivePartyRoom(party); }); }}>{partyBusyIds.includes(party.id) ? "Saving…" : partyJoinedIds.includes(party.id) ? "Join room" : "Join & enter"} <span>↗</span></button>{partyJoinedIds.includes(party.id) && <button type="button" className="party-cancel-rsvp" disabled={partyBusyIds.includes(party.id)} onClick={() => void togglePartyMembership(party)}>Leave</button>}</>}
               </div></div>
             </article>)}
           </div>}
@@ -1382,7 +1386,7 @@ export default function HomePage() {
             {partyEntries.filter(p => p.status === "scheduled" && (partyFilter === "all" || partyFilter === "upcoming" || partyFilter === "mine") && (partyFilter !== "mine" || p.host_id === userId)).map(party => <article key={party.id}>
               <div className="upcoming-date"><b>{new Date(party.scheduled_at).toLocaleDateString(undefined,{day:"2-digit"})}</b><span>{new Date(party.scheduled_at).toLocaleDateString(undefined,{month:"short"}).toUpperCase()}</span></div>
               <div className="upcoming-copy"><h3>{party.title}</h3><p><CalendarClock size={13}/> {new Date(party.scheduled_at).toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})} · Hosted by {party.hostName} · {party.format === "audio" ? "Audio" : party.format === "watch" ? "Watch party" : "Video"} · {party.participant_count} going</p>{party.description && <p>{party.description}</p>}</div>
-              <div className="upcoming-party-actions">{party.host_id === userId ? <><button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => { void updatePartyStatus(party,"live"); setActivePartyRoom({ ...party, status: "live" }); }}>Start & enter ↗</button><button type="button" className="party-cancel-rsvp" disabled={partyBusyIds.includes(party.id)} onClick={() => void updatePartyStatus(party,"ended")}>Cancel</button></> : <button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => void togglePartyMembership(party)}>{partyBusyIds.includes(party.id) ? "Saving…" : partyJoinedIds.includes(party.id) ? "Going ✓" : "I’m going ＋"}</button>}</div>
+              <div className="upcoming-party-actions">{party.host_id === userId ? <><button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => { void updatePartyStatus(party,"live").then(started => { if (started) setActivePartyRoom({ ...party, status: "live" }); }); }}>Start & enter ↗</button><button type="button" className="party-cancel-rsvp" disabled={partyBusyIds.includes(party.id)} onClick={() => void updatePartyStatus(party,"ended")}>Cancel</button></> : <button type="button" disabled={partyBusyIds.includes(party.id)} onClick={() => void togglePartyMembership(party)}>{partyBusyIds.includes(party.id) ? "Saving…" : partyJoinedIds.includes(party.id) ? "Going ✓" : "I’m going ＋"}</button>}</div>
             </article>)}
           </div>}
           {partyEntries.filter(p => partyFilter === "mine" ? p.host_id === userId : partyFilter === "live" ? p.status === "live" : partyFilter === "upcoming" ? p.status === "scheduled" : true).length === 0 && <div className="party-empty-state"><b>{partyFilter === "mine" ? "You haven’t hosted a party yet." : partyFilter === "live" ? "No parties are live right now." : partyFilter === "upcoming" ? "Nothing scheduled just yet." : "Be the first to bring people together."}</b><p>{partyFilter === "mine" ? "Create a party and it’ll show up here." : "Create a party, invite your community, and give everyone something to look forward to."}</p></div>}
