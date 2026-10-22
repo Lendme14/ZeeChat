@@ -53,6 +53,8 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [comments, setComments] = useState<PartyComment[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [chatOpen, setChatOpen] = useState(true);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState("");
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const commentsListRef = useRef<HTMLDivElement>(null);
   const watchActionNonce = useRef(0);
@@ -261,6 +263,26 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
           });
         });
         if (cancelled) return;
+        const { data: savedComments, error: historyError } = await supabase
+          .from("zeechat_party_comments")
+          .select("id, user_id, body, created_at")
+          .eq("party_id", party.id)
+          .order("created_at", { ascending: false })
+          .limit(80);
+        if (historyError) {
+          console.warn("Could not load live chat history", historyError);
+        } else if (savedComments?.length) {
+          const history = savedComments.reverse().map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            message: row.body,
+            at: new Date(row.created_at).getTime(),
+          }));
+          setComments(current => {
+            const merged = [...history, ...current];
+            return merged.filter((item, index) => merged.findIndex(other => other.id === item.id) === index).slice(-80);
+          });
+        }
         setConnecting(false);
         send({ kind: "hello", from: userId });
       } catch (err) {
@@ -287,15 +309,39 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     streamRef.current?.getVideoTracks().forEach(track => { track.enabled = !next; });
   }
   function leave() { onClose(); }
-  function sendComment(event: React.FormEvent<HTMLFormElement>) {
+  async function sendComment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = commentDraft.trim().slice(0, 240);
-    if (!message) return;
-    const messageId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${userId}-${Date.now()}`;
-    const comment: PartyComment = { id: messageId, userId, message, at: Date.now() };
-    setComments(current => [...current, comment].slice(-80));
-    setCommentDraft("");
-    send({ kind: "chat", from: userId, message, messageId });
+    if (!message || chatSending) return;
+    setChatSending(true);
+    setChatError("");
+    try {
+      const supabase = createClient();
+      const { data, error: insertError } = await supabase
+        .from("zeechat_party_comments")
+        .insert({ party_id: party.id, user_id: userId, body: message })
+        .select("id, user_id, body, created_at")
+        .single();
+      if (insertError || !data) {
+        console.warn("Could not save live comment", insertError);
+        setChatError("Couldn't send that comment. Please try again.");
+        return;
+      }
+      const comment: PartyComment = {
+        id: data.id,
+        userId: data.user_id,
+        message: data.body,
+        at: new Date(data.created_at).getTime(),
+      };
+      setComments(current => current.some(item => item.id === comment.id) ? current : [...current, comment].slice(-80));
+      setCommentDraft("");
+      send({ kind: "chat", from: userId, message, messageId: data.id });
+    } catch (err) {
+      console.warn("Live comment submission failed", err);
+      setChatError("Couldn't send that comment. Please try again.");
+    } finally {
+      setChatSending(false);
+    }
   }
   function setWatchSource(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -325,7 +371,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
       <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">You</div>}<span>You {party.host_id === userId ? "· Host" : ""}</span></article>
       {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} audioOnly={party.format === "audio"}/>)}
       {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : party.format === "watch" ? <><Users size={28}/><b>Watch party is ready</b><p>Share a video link above and everyone can watch together.</p></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
-    </div><aside className={`party-live-chat ${chatOpen ? "chat-open" : "chat-collapsed"}`} aria-label="Live comments"><div className="party-live-chat-top"><div><MessageCircle size={16}/><b>Live chat</b><span className="party-chat-count">{comments.length}</span></div><button type="button" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Collapse chat" : "Open chat"}>{chatOpen ? <X size={16}/> : <MessageCircle size={18}/>}</button></div>{chatOpen && <><div className="party-live-comments" aria-live="polite" ref={commentsListRef}>{comments.length === 0 ? <p className="party-chat-empty">Say hello 👋 Be kind and keep the conversation flowing.</p> : comments.map(comment => <div className={`party-live-comment ${comment.userId === userId ? "is-own-comment" : ""}`} key={comment.id}><span className="party-comment-avatar">{comment.userId === userId ? "YOU" : comment.userId.slice(0, 2).toUpperCase()}</span><p><b>{comment.userId === userId ? "You" : `Guest ${comment.userId.slice(0, 5)}`}</b><span>{comment.message}</span></p>{comment.userId === userId && <Heart size={13}/>}</div>)}</div><form className="party-live-chat-form" onSubmit={sendComment}><button type="button" className="party-live-react" onClick={reactLive} aria-label="Send a heart reaction"><Heart size={19} fill="currentColor"/></button><input aria-label="Write a comment" value={commentDraft} onChange={event => setCommentDraft(event.target.value)} placeholder="Add a comment…" maxLength={240}/><button type="submit" disabled={!commentDraft.trim()} aria-label="Send comment"><Send size={17}/></button></form></>}</aside><footer className="party-room-controls party-room-glass">{party.format !== "watch" && <button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>}{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-chat-toggle" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Hide comments" : "Show comments"}><MessageCircle size={20}/><span>Chat</span></button><button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave</span></button></footer></>}
+    </div><aside className={`party-live-chat ${chatOpen ? "chat-open" : "chat-collapsed"}`} aria-label="Live comments"><div className="party-live-chat-top"><div><MessageCircle size={16}/><b>Live chat</b><span className="party-chat-count">{comments.length}</span></div><button type="button" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Collapse chat" : "Open chat"}>{chatOpen ? <X size={16}/> : <MessageCircle size={18}/>}</button></div>{chatOpen && <><div className="party-live-comments" aria-live="polite" ref={commentsListRef}>{comments.length === 0 ? <p className="party-chat-empty">Say hello 👋 Be kind and keep the conversation flowing.</p> : comments.map(comment => <div className={`party-live-comment ${comment.userId === userId ? "is-own-comment" : ""}`} key={comment.id}><span className="party-comment-avatar">{comment.userId === userId ? "YOU" : comment.userId.slice(0, 2).toUpperCase()}</span><p><b>{comment.userId === userId ? "You" : `Guest ${comment.userId.slice(0, 5)}`}</b><span>{comment.message}</span></p>{comment.userId === userId && <Heart size={13}/>}</div>)}</div><form className="party-live-chat-form" onSubmit={sendComment}><button type="button" className="party-live-react" onClick={reactLive} aria-label="Send a heart reaction"><Heart size={19} fill="currentColor"/></button><input aria-label="Write a comment" value={commentDraft} onChange={event => setCommentDraft(event.target.value)} placeholder="Add a comment…" maxLength={240}/><button type="submit" disabled={!commentDraft.trim() || chatSending} aria-label="Send comment">{chatSending ? <LoaderCircle size={17} className="animate-spin"/> : <Send size={17}/>}</button></form>{chatError && <p className="party-chat-error" role="status">{chatError}</p>}</>}</aside><footer className="party-room-controls party-room-glass">{party.format !== "watch" && <button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>}{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-chat-toggle" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Hide comments" : "Show comments"}><MessageCircle size={20}/><span>Chat</span></button><button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave</span></button></footer></>}
     <p className="party-room-footnote">{party.format === "watch" ? "YouTube videos play in the embedded player · Direct video links support synchronized controls" : "Live peer-to-peer media · Camera and microphone access required · Best for small groups"}</p>
   </section>;
 }
