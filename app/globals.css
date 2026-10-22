@@ -1995,3 +1995,18 @@ body {
 @media(prefers-reduced-motion:reduce){
  .reels-view.immersive-reels .reel-player.reel-enter,.reels-view.immersive-reels .reel-player.reel-enter .reel-caption{animation:none!important}
 }
+
+
+/* Reel action rail is a sibling of the media stage, not nested inside it. */
+.reels-view.immersive-reels .reel-layout>.reel-actions{
+  position:absolute!important;z-index:12!important;right:8px!important;left:auto!important;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 22px)!important;width:48px!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;gap:12px!important;padding:0!important;
+}
+@media(min-width:760px){
+ .reels-view.immersive-reels .reel-layout>.reel-actions{
+   position:relative!important;right:auto!important;left:auto!important;bottom:auto!important;
+   grid-column:2!important;align-self:center!important;justify-self:center!important;width:64px!important;
+   gap:16px!important;
+ }
+}
