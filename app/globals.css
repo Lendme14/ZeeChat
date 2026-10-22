@@ -1536,3 +1536,36 @@ body {
   .sound-disc-playing .sound-vinyl,.reel-sound-disc.spinning{animation:none!important}
   .reels-view.immersive-reels .reel-actions .reel-reaction-button.liked .action-circle svg{animation:none!important}
 }
+
+
+/* Functional party discovery and RSVP controls */
+.party-mode-switch{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.party-mode-switch::-webkit-scrollbar{display:none}
+.party-mode-switch button{white-space:nowrap;cursor:pointer;transition:background .18s ease,color .18s ease}
+.party-mode-switch button:focus-visible,.party-live-card button:focus-visible,.upcoming-party-list button:focus-visible,.party-bottom-cta button:focus-visible{outline:2px solid #7ce7c5;outline-offset:3px}
+.party-live-card .party-card-actions{position:relative;z-index:1;display:flex;gap:8px;margin-top:15px}
+.party-live-card .party-card-actions button{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:40px;padding:10px 12px;border:1px solid #ffffff25;border-radius:11px;background:#ffffff0b;color:#effaf5;font-size:11px;font-weight:800;cursor:pointer}
+.party-live-card .party-card-actions button:hover{background:#ffffff17}
+.party-live-card button:disabled,.upcoming-party-list button:disabled,.text-action:disabled{opacity:.55;cursor:wait}
+.upcoming-party-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.upcoming-party-list .upcoming-party-actions button{display:flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;min-height:36px;padding:8px 11px;border:1px solid #34443e;border-radius:10px;background:#18211e;color:#b8c7c1;font-size:10px;font-weight:750;cursor:pointer}
+.upcoming-party-list .upcoming-party-actions button:hover{border-color:#3e8a70;color:#a3f1d7}
+.upcoming-party-list .upcoming-party-actions .party-cancel-rsvp{background:transparent;color:#a7b4b1}
+.upcoming-copy p+p{margin-top:5px}
+.party-empty-state{margin:12px 0;padding:24px;border:1px dashed #33433d;border-radius:16px;background:#101615;color:#edf5f1}
+.party-empty-state b{font-size:14px}
+.party-empty-state p{margin:7px 0 0;color:#95a59e;font-size:12px;line-height:1.6}
+.party-capability-note{margin:12px 2px 0;color:#7f9089;font-size:10px;line-height:1.6}
+.party-create-modal input[type="datetime-local"]{width:100%;min-height:42px;padding:10px 12px;border:1px solid #2c3935;border-radius:10px;background:#0d1312;color:#f0f6f3;color-scheme:dark;font:inherit}
+.party-create-modal input[type="datetime-local"]:focus-visible{outline:2px solid #4ccca2;outline-offset:2px}
+@media(max-width:600px){
+ .party-mode-switch{width:100%;margin:18px 0 24px}
+ .party-mode-switch button{padding:10px 13px;font-size:11px}
+ .upcoming-party-list article{align-items:flex-start;flex-wrap:wrap}
+ .upcoming-party-list .upcoming-copy{flex:1 1 calc(100% - 65px)}
+ .upcoming-party-list .upcoming-party-actions{width:100%;flex-direction:row;justify-content:flex-end;padding-left:62px}
+ .upcoming-party-list .upcoming-party-actions button{flex:1}
+ .party-live-card .party-card-actions button{min-height:42px}
+ .party-capability-note{padding-bottom:10px}
+}
+@media(prefers-reduced-motion:reduce){.party-mode-switch button{transition:none}}
