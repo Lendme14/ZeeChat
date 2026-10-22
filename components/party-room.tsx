@@ -65,7 +65,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
         streamRef.current = stream;
         if (localVideo.current) localVideo.current.srcObject = stream;
         const supabase = createClient();
-        channel = supabase.channel("zeechat-party-room-" + party.id, { config: { broadcast: { self: false } } });
+        channel = supabase.channel("zeechat-party-room-" + party.id, { config: { private: true, broadcast: { self: false } } });
         channelRef.current = channel;
         channel.on("broadcast", { event: "signal" }, async ({ payload }) => {
           const signal = payload as Signal;
