@@ -2082,3 +2082,25 @@ body {
 @media(prefers-reduced-motion:reduce){
  .reels-view.immersive-reels .reel-video-controls{transition:none!important}
 }
+
+
+/* Functional Reel options sheet */
+.reel-options-backdrop{position:fixed;inset:0;z-index:220;display:flex;align-items:flex-end;justify-content:center;padding:14px;background:#03040ac9;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+.reel-options-sheet{width:min(100%,520px);max-height:min(78dvh,680px);overflow:auto;padding:20px 16px calc(18px + env(safe-area-inset-bottom,0px));border:1px solid #ffffff1c;border-radius:24px 24px 20px 20px;background:linear-gradient(160deg,#191b29,#0c0e17 70%);box-shadow:0 24px 90px #000b;color:#fff;animation:reel-options-in .2s ease-out both}
+.reel-options-sheet>header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 2px 12px}
+.reel-options-sheet>header h2{margin:4px 0 0;font-size:23px;letter-spacing:-.04em}
+.reel-options-close{display:grid;place-items:center;width:38px;height:38px;border:1px solid #ffffff20;border-radius:50%;background:#ffffff0b;color:#fff;font-size:25px;cursor:pointer}
+.reel-option-row{display:flex;align-items:center;gap:13px;width:100%;min-height:66px;padding:10px 9px;border:0;border-radius:15px;background:transparent;color:#fff;text-align:left;cursor:pointer;transition:background .16s ease}
+.reel-option-row:hover:not(:disabled),.reel-option-row:focus-visible{background:#ffffff0d;outline:none}
+.reel-option-row:disabled{opacity:.45;cursor:not-allowed}
+.reel-option-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid #ffffff18;border-radius:14px;background:#ffffff0b;color:#d8d9ff}
+.reel-option-row>span:last-child{display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+.reel-option-row b{font-size:14px;font-weight:650}
+.reel-option-row small{font-size:11px;line-height:1.4;color:#a7a9bb}
+.reel-options-divider{height:1px;margin:8px 4px;background:#ffffff16}
+.reel-option-delete .reel-option-icon{color:#ff7d91;background:#ff526510;border-color:#ff52652b}
+.reel-option-delete b{color:#ff8b9b}
+.reel-options-footnote{margin:12px 6px 0;color:#85889b;font-size:10px;line-height:1.5}
+@keyframes reel-options-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@media(min-width:760px){.reel-options-backdrop{align-items:center}.reel-options-sheet{border-radius:24px}}
+@media(prefers-reduced-motion:reduce){.reel-options-sheet{animation:none}}
