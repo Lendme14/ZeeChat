@@ -522,6 +522,10 @@ export default function HomePage() {
     setMediaPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [mediaFile]);
+  useEffect(() => {
+    if (!pendingUploadPost) return;
+    setPendingUploadPost(current => current ? { ...current, progress: uploadProgress ?? current.progress, label: uploadLabel || current.label } : current);
+  }, [uploadProgress, uploadLabel]);
 
   function handleReelDoubleTap() {
     if (selectedLiveReel) {
