@@ -1340,6 +1340,41 @@ export default function HomePage() {
     });
   }
 
+  async function prepareImageForPublish(file: File): Promise<File> {
+    if (!file.type.startsWith("image/") || file.type === "image/gif" || (editorFilter === "none" && editorZoom === 1 && editorRatio === "original")) return file;
+    return new Promise((resolve, reject) => {
+      const image = new window.Image();
+      const url = URL.createObjectURL(file);
+      image.onload = () => {
+        try {
+          const sw = image.naturalWidth, sh = image.naturalHeight;
+          let ratio = sw / sh;
+          if (editorRatio === "square") ratio = 1;
+          if (editorRatio === "portrait") ratio = 4 / 5;
+          if (editorRatio === "story") ratio = 9 / 16;
+          let cw = sw, ch = sh;
+          if (sw / sh > ratio) cw = sh * ratio; else ch = sw / ratio;
+          cw /= editorZoom; ch /= editorZoom;
+          const sx = (sw - cw) / 2, sy = (sh - ch) / 2;
+          const ow = Math.max(1, Math.round(Math.min(1440, cw))), oh = Math.max(1, Math.round(ow / ratio));
+          const canvas = document.createElement("canvas"); canvas.width = ow; canvas.height = oh;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Image editor is unavailable on this device.");
+          const filters: Record<string,string> = {none:"none",warm:"saturate(1.12) sepia(.22)",mono:"grayscale(1) contrast(1.08)",vivid:"saturate(1.55) contrast(1.08)",cool:"saturate(1.08) hue-rotate(12deg)",fade:"contrast(.88) saturate(.82) brightness(1.08)"};
+          ctx.filter = filters[editorFilter] || "none";
+          ctx.drawImage(image, sx, sy, cw, ch, 0, 0, ow, oh);
+          canvas.toBlob(blob => {
+            URL.revokeObjectURL(url);
+            if (!blob) { reject(new Error("Could not export your edited image.")); return; }
+            resolve(new File([blob], (file.name.replace(/\.[^.]+$/, "") || "zeechat-photo") + "-edited.jpg", {type:"image/jpeg",lastModified:Date.now()}));
+          }, "image/jpeg", .92);
+        } catch (error) { URL.revokeObjectURL(url); reject(error); }
+      };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not open this photo for editing.")); };
+      image.src = url;
+    });
+  }
+
   async function publish() {
     if (!caption.trim() && !mediaFile) return;
     if (!userId) { setNotice("Sign in first to publish a post."); return; }
@@ -1350,21 +1385,22 @@ export default function HomePage() {
     const uploadedPaths: string[] = [];
     let postInserted = false;
     try {
+      const uploadMedia = mediaFile ? await prepareImageForPublish(mediaFile) : null;
       let mediaUrl: string | null = null;
       let soundId: string | null = selectedSound?.id ?? null;
       let thumbnailUrl: string | null = null;
       let publishedType = "text";
-      if (mediaFile) {
-        const isVideo = mediaFile.type.startsWith("video/");
+      if (uploadMedia) {
+        const isVideo = uploadMedia.type.startsWith("video/");
         const allowedTypes = isVideo ? ["video/mp4", "video/webm", "video/quicktime"] : ["image/jpeg", "image/png", "image/webp", "image/gif"];
         const maxBytes = isVideo ? 100 * 1024 * 1024 : 8 * 1024 * 1024;
-        if (!allowedTypes.includes(mediaFile.type)) throw new Error(isVideo ? "Choose an MP4, WebM or MOV video." : "Choose a JPEG, PNG, WebP or GIF image.");
-        if (mediaFile.size > maxBytes) throw new Error(isVideo ? "Choose a video smaller than 100 MB." : "Choose an image smaller than 8 MB.");
-        const extension = mediaFile.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
+        if (!allowedTypes.includes(uploadMedia.type)) throw new Error(isVideo ? "Choose an MP4, WebM or MOV video." : "Choose a JPEG, PNG, WebP or GIF image.");
+        if (uploadMedia.size > maxBytes) throw new Error(isVideo ? "Choose a video smaller than 100 MB." : "Choose an image smaller than 8 MB.");
+        const extension = uploadMedia.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
         const path = userId + "/" + crypto.randomUUID() + "." + extension;
         setUploadLabel(isVideo ? "Uploading video…" : "Uploading photo…");
         setUploadProgress(0);
-        await uploadWithProgress(path, mediaFile, mediaFile.type, setUploadProgress);
+        await uploadWithProgress(path, uploadMedia, uploadMedia.type, setUploadProgress);
         uploadedPaths.push(path);
         mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(path).data.publicUrl;
         publishedType = isVideo ? "reel" : "image";
