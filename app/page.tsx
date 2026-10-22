@@ -1405,7 +1405,7 @@ export default function HomePage() {
         mediaUrl = supabase.storage.from("zeechat-media").getPublicUrl(path).data.publicUrl;
         publishedType = isVideo ? "reel" : "image";
         if (isVideo) {
-          const thumbnail = await createVideoThumbnail(mediaFile);
+          const thumbnail = await createVideoThumbnail(uploadMedia);
           const thumbnailPath = userId + "/" + crypto.randomUUID() + ".jpg";
           setUploadLabel("Finishing Reel thumbnail…");
           await uploadWithProgress(thumbnailPath, thumbnail, "image/jpeg", () => {});
