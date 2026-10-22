@@ -1597,3 +1597,14 @@ body {
 .party-room-error p{color:#c4bfd1;line-height:1.6}
 .party-room-error button{border:0;border-radius:12px;background:#8b5cf6;color:white;padding:11px 16px;font-weight:700;cursor:pointer}
 @media(max-width:600px){.party-room-overlay{padding:14px}.party-room-header{align-items:flex-start}.party-room-header p{font-size:11px}.party-room-stage{grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}.party-room-tile{min-height:165px;border-radius:15px}.party-room-controls{gap:8px}.party-room-controls button{min-width:90px;padding:11px 12px}.party-room-controls button span{font-size:12px}}
+
+.party-watch-panel{width:min(100%,980px);margin:0 auto 22px;padding:16px;border:1px solid #343349;border-radius:20px;background:#11111c}
+.party-watch-source{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-bottom:14px}
+.party-watch-source label{font-size:12px;font-weight:750;color:#c7c4dc}
+.party-watch-source input{min-width:0;width:100%;border:1px solid #3b3a50;background:#191927;color:#fff;border-radius:11px;padding:12px 13px;outline:none}
+.party-watch-source input:focus{border-color:#a78bfa;box-shadow:0 0 0 3px #8b5cf626}
+.party-watch-source button{border:0;border-radius:11px;background:linear-gradient(120deg,#8b5cf6,#ec4899);color:white;padding:12px 15px;font-weight:750;cursor:pointer}
+.party-watch-player{display:block;width:100%;max-height:54vh;aspect-ratio:16/9;object-fit:contain;background:#050508;border-radius:14px}
+.party-watch-empty{display:flex;min-height:150px;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;color:#eeeafc;background:#191927;border:1px dashed #414057;border-radius:14px}
+.party-watch-empty p{max-width:520px;color:#aaa8bd;font-size:13px;line-height:1.6;margin:8px 0 0}
+@media(max-width:600px){.party-watch-panel{padding:11px;border-radius:15px}.party-watch-source{grid-template-columns:1fr;gap:8px}.party-watch-source label{margin-bottom:1px}.party-watch-source button{width:100%}.party-watch-player{max-height:38vh}}
