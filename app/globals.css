@@ -2215,3 +2215,15 @@ body {
 .follow-request-row>div b,.follow-request-row>div small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .follow-request-row>div small{color:var(--muted,#999);font-size:.82rem}
 .follow-request-row button{white-space:nowrap;padding:8px 10px;font-size:.82rem}
+
+
+/* Persistent Reel draft list */
+.reel-drafts-panel{display:grid;gap:10px;margin:18px 0;padding:14px;border:1px solid var(--border,#2a2a2a);border-radius:16px;background:var(--surface,#111)}
+.reel-drafts-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.reel-drafts-heading small{color:var(--muted,#999);font-size:.8rem}
+.reel-drafts-panel>p{margin:0;color:var(--muted,#999);font-size:.9rem}
+.reel-draft-row{display:flex;align-items:center;gap:8px;padding-top:10px;border-top:1px solid var(--border,#2a2a2a)}
+.reel-draft-row>div{display:grid;gap:3px;flex:1;min-width:0}
+.reel-draft-row>div b,.reel-draft-row>div small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reel-draft-row>div small{color:var(--muted,#999);font-size:.8rem}
+.reel-draft-row button{white-space:nowrap;padding:7px 10px;font-size:.8rem}
