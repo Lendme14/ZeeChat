@@ -496,6 +496,12 @@ export default function HomePage() {
   }
 
   function handleReelTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (target instanceof Element && target.closest("button,input,textarea,select,a,[role='slider'],.reel-comments-panel")) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
     touchStartX.current = event.touches[0]?.clientX ?? null;
     touchStartY.current = event.touches[0]?.clientY ?? null;
   }
@@ -510,7 +516,8 @@ export default function HomePage() {
     if (startX === null || startY === null || endX === undefined || endY === undefined) return;
     const dx = endX - startX;
     const dy = endY - startY;
-    if (Math.abs(dy) >= 36 && Math.abs(dy) > Math.abs(dx) * 1.05) moveReel(dy < 0 ? 1 : -1);
+    // Require a deliberate vertical swipe; taps, horizontal drags and control gestures do not change the Reel.
+    if (Math.abs(dy) >= 64 && Math.abs(dy) > Math.abs(dx) * 1.25) moveReel(dy < 0 ? 1 : -1);
   }
 
   useEffect(() => {
