@@ -2147,3 +2147,33 @@ body {
 }
 .reel-comment-sticker-tray button:active{transform:scale(.9);background:rgba(255,255,255,.18)}
 @media(max-width:420px){.reel-comment-sticker-tray{gap:4px;padding:7px 9px}.reel-comment-sticker-tray button{flex-basis:28px;width:28px;height:28px;font-size:16px}}
+
+
+/* Creator studio: mobile-first media editing and progress anchored to the thumbnail */
+.media-editor-modal{width:min(100%,620px)!important;max-height:min(92dvh,920px)!important;overflow:auto!important}
+.editor-intro{margin:-5px 0 16px;color:#a8aec1;font-size:13px;line-height:1.5}
+.editor-file-input{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+.editor-gallery-pick{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;min-height:150px;margin:10px 0 16px;padding:20px;border:1px dashed #6d7897;border-radius:20px;background:linear-gradient(145deg,#242944,#141725);color:#fff;cursor:pointer}
+.editor-gallery-pick>span{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:#8b7cff26;color:#c8c2ff;font-size:34px}
+.editor-gallery-pick small{color:#aab0c5;font-size:11px}
+.editor-preview-wrap{margin:10px 0 16px}
+.editor-preview{position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-height:46dvh;min-height:180px;overflow:hidden;border-radius:18px;background:#070910}
+.editor-preview.editor-ratio-original{aspect-ratio:4/3}.editor-preview.editor-ratio-square{aspect-ratio:1/1;max-width:440px;margin:auto}.editor-preview.editor-ratio-portrait{aspect-ratio:4/5;max-width:420px;margin:auto}.editor-preview.editor-ratio-story{aspect-ratio:9/16;max-width:330px;margin:auto}
+.editor-preview img,.editor-preview video{display:block;width:100%;height:100%;max-height:46dvh;object-fit:cover;transition:filter .16s ease,transform .16s ease}
+.editor-change-media{position:absolute;z-index:3;top:10px;right:10px;padding:7px 10px;border:1px solid #ffffff2a;border-radius:999px;background:#090b15bd;color:white;font-size:11px}
+.editor-upload-overlay{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#060811b8;backdrop-filter:blur(5px);color:#fff;text-align:center}
+.editor-upload-overlay .upload-progress-ring{width:64px;height:64px;font-size:13px}
+.editor-tool-block{margin:14px 0}.editor-tool-block>b{display:block;margin-bottom:8px;font-size:13px}
+.editor-filter-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.editor-filter-row button{min-width:0;padding:9px 3px;border:1px solid #ffffff17;border-radius:10px;background:#ffffff08;color:#d5d8e6;font-size:11px}
+.editor-filter-row button.selected{border-color:#a69cff;background:#8b7cff26;color:#fff}
+.editor-controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.editor-controls-grid label,.editor-sound-row>label{display:flex;flex-direction:column;gap:7px;color:#b9bed0;font-size:12px}
+.editor-controls-grid select,.editor-sound-row select{width:100%;min-height:38px;padding:8px 10px;border:1px solid #ffffff1c;border-radius:10px;background:#111522;color:#fff}
+.editor-controls-grid input[type=range]{width:100%;accent-color:#a99cff}
+.editor-sound-row{display:flex;align-items:end;gap:10px;margin:12px 0}
+.editor-sound-row>label{flex:1;min-width:0}
+.editor-audio-pick input{max-width:100%;font-size:10px;color:#cbd0df}
+.editor-remove-sound{padding:8px;border:1px solid #ffffff1c;border-radius:9px;background:#ffffff08;color:#ffb5c0;font-size:11px}
+.editor-media-meta{margin:8px 0;color:#9299ad;font-size:10px;overflow-wrap:anywhere}
+@media(max-width:420px){.media-editor-modal{padding:20px 14px calc(18px + env(safe-area-inset-bottom,0px))!important}.editor-filter-row{grid-template-columns:repeat(3,minmax(0,1fr))}.editor-controls-grid{grid-template-columns:1fr;gap:10px}.editor-sound-row{flex-wrap:wrap}.editor-preview{max-height:38dvh}.editor-preview img,.editor-preview video{max-height:38dvh}}
