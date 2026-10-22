@@ -5,6 +5,7 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Radio, LoaderCircle, Sen
 import { createClient } from "@/lib/supabase/client";
 
 type PartyRoomInfo = { id: string; title: string; format: "video" | "audio" | "watch"; host_id: string };
+type LiveProfile = { user_id: string; username: string; display_name: string; avatar_url: string | null };
 type WatchAction = { kind: "watch-play" | "watch-pause" | "watch-seek"; time: number; nonce: number };
 type PartyComment = { id: string; userId: string; message: string; at: number };
 type FloatingReaction = { id: string; emoji: string };
@@ -65,7 +66,7 @@ function getYouTubeVideoId(value: string): string | null {
   } catch { return null; }
 }
 
-export default function PartyRoom({ party, userId, onClose }: { party: PartyRoomInfo; userId: string; onClose: () => void }) {
+export default function PartyRoom({ party, userId, onClose, onOpenProfile, isBrowsingProfile = false }: { party: PartyRoomInfo; userId: string; onClose: () => void; onOpenProfile: (profile: LiveProfile) => void; isBrowsingProfile?: boolean }) {
   const localVideo = useRef<HTMLVideoElement>(null);
   const watchVideo = useRef<HTMLVideoElement>(null);
   const watchUrlRef = useRef("");
@@ -82,6 +83,9 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(party.format !== "video");
   const [participants, setParticipants] = useState<string[]>([]);
+  const [liveProfiles, setLiveProfiles] = useState<Record<string, LiveProfile>>({});
+  const [followingLiveUsers, setFollowingLiveUsers] = useState<Record<string, boolean>>({});
+  const [followBusyIds, setFollowBusyIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [connecting, setConnecting] = useState(true);
   const [watchUrl, setWatchUrl] = useState("");
@@ -96,6 +100,69 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const commentsListRef = useRef<HTMLDivElement>(null);
   const watchActionNonce = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    const ids = [...new Set([userId, ...participants])];
+    if (!ids.length) { setLiveProfiles({}); return () => { active = false; }; }
+    const loadLiveProfiles = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.from("zeechat_profiles")
+          .select("user_id,username,display_name,avatar_url")
+          .in("user_id", ids);
+        if (error) throw error;
+        if (!active) return;
+        const map: Record<string, LiveProfile> = {};
+        (data ?? []).forEach(row => { map[row.user_id] = { ...row, avatar_url: row.avatar_url ?? null }; });
+        setLiveProfiles(map);
+        const otherIds = ids.filter(id => id !== userId);
+        if (otherIds.length) {
+          const { data: follows, error: followError } = await supabase.from("zeechat_follows")
+            .select("followed_id").eq("follower_id", userId).in("followed_id", otherIds);
+          if (!followError && active) {
+            const followed = new Set((follows ?? []).map(row => row.followed_id));
+            setFollowingLiveUsers(Object.fromEntries(otherIds.map(id => [id, followed.has(id)])));
+          }
+        }
+      } catch (profileError) {
+        console.warn("Could not load live participant profiles", profileError);
+      }
+    };
+    void loadLiveProfiles();
+    return () => { active = false; };
+  }, [participants, userId]);
+
+  async function toggleLiveFollow(targetId: string) {
+    if (targetId === userId || followBusyIds.includes(targetId)) return;
+    const profile = liveProfiles[targetId];
+    if (!profile) { setError("This participant does not have a linked ZeeChat profile yet."); return; }
+    setFollowBusyIds(current => [...current, targetId]);
+    const wasFollowing = Boolean(followingLiveUsers[targetId]);
+    setFollowingLiveUsers(current => ({ ...current, [targetId]: !wasFollowing }));
+    try {
+      const supabase = createClient();
+      if (wasFollowing) {
+        const { error } = await supabase.from("zeechat_follows").delete()
+          .eq("follower_id", userId).eq("followed_id", targetId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("zeechat_follows").insert({ follower_id: userId, followed_id: targetId });
+        if (error) throw error;
+      }
+    } catch (followError) {
+      setFollowingLiveUsers(current => ({ ...current, [targetId]: wasFollowing }));
+      setError(followError instanceof Error ? followError.message : "Could not update follow status. Please try again.");
+    } finally {
+      setFollowBusyIds(current => current.filter(id => id !== targetId));
+    }
+  }
+
+  function openLiveProfile(targetId: string) {
+    const profile = liveProfiles[targetId];
+    if (!profile) { setError("This participant's profile is still loading. Try again in a moment."); return; }
+    onOpenProfile(profile);
+  }
 
   useEffect(() => {
     if (!chatOpen) return;
@@ -402,22 +469,33 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     send({ kind, from: userId, time: video.currentTime });
   }
 
-  return <section className={`party-room-overlay party-room-fullscreen party-room-${party.format}`} role="dialog" aria-modal="true" aria-label={party.title}>
+  return <section className={`party-room-overlay party-room-fullscreen party-room-${party.format}${isBrowsingProfile ? " party-room-profile-hidden" : ""}`} style={isBrowsingProfile ? { display: "none" } : undefined} role="dialog" aria-modal="true" aria-label={party.title}>
     <div className="party-floating-reactions" aria-hidden="true">{floatingReactions.map(item => <span key={item.id} className="party-floating-reaction">{item.emoji}</span>)}</div>
     <header className="party-room-header party-room-glass"><div className="party-room-heading"><span className="party-room-live"><span className="party-live-dot" /> LIVE</span><h2>{party.title}</h2><p><Users size={14}/> {participants.length + 1} here <span className="party-room-type">{party.format === "audio" ? "Audio room" : party.format === "watch" ? "Watch party" : "Video room"}</span></p></div><button type="button" className="party-room-leave" onClick={leave} aria-label="Leave live room"><X size={18}/></button></header>
     {error ? <div className="party-room-error"><b>{connecting ? "Couldn’t join the room" : "Something needs attention"}</b><p>{error}</p><button type="button" onClick={() => setError("")}>Dismiss</button><button type="button" onClick={leave}>Back to parties</button></div> : <>{party.format === "watch" && <section className="party-watch-panel"><form className="party-watch-source" onSubmit={setWatchSource}><label htmlFor="party-watch-url">Video URL</label><input id="party-watch-url" type="url" value={watchUrlDraft} onChange={event => setWatchUrlDraft(event.target.value)} placeholder="YouTube link or direct MP4/WebM URL" maxLength={2000} /><button type="submit">Share video</button></form>{watchError && <p className="party-watch-error" role="alert">{watchError}</p>}{watchUrl ? (() => { const videoId = getYouTubeVideoId(watchUrl); const embed = getWatchEmbed(watchUrl, typeof window !== "undefined" ? window.location.origin : "https://zee-chat-three.vercel.app"); if (videoId) return <YouTubeWatchPlayer key={videoId} videoId={videoId} command={youtubeCommand} onAction={(kind, time) => send({ kind, from: userId, time })} />; if (embed) return <div className="party-watch-embed"><iframe key={embed.src} className="party-watch-player party-watch-iframe" src={embed.src} title={embed.label + " player"} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /></div>; if (/\.(mp4|webm|ogv|ogg)(?:$)/i.test(new URL(watchUrl).pathname)) return <video ref={watchVideo} className="party-watch-player" src={watchUrl} controls playsInline onPlay={() => broadcastWatchAction("watch-play")} onPause={() => broadcastWatchAction("watch-pause")} onSeeked={() => broadcastWatchAction("watch-seek")} />; return <div className="party-watch-empty"><b>This link may not be embeddable</b><p>Some platforms block playback inside other apps. Try YouTube, Vimeo, Dailymotion, TikTok, Twitch, or a direct MP4/WebM link.</p><a href={watchUrl} target="_blank" rel="noreferrer">Open on original platform ↗</a></div>; })() : <div className="party-watch-empty"><b>Choose a video to watch together</b><p>Paste a YouTube, Vimeo, Dailymotion, TikTok, Twitch, or direct MP4/WebM link.</p></div>}</section>}<div className={"party-room-stage " + (party.format === "audio" || party.format === "watch" ? "audio-stage" : "")}>
-      <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">You</div>}<span>You {party.host_id === userId ? "· Host" : ""}</span></article>
-      {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} audioOnly={party.format === "audio"}/>)}
+      <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">{liveProfiles[userId]?.avatar_url ? <img src={liveProfiles[userId].avatar_url!} alt="" /> : (liveProfiles[userId]?.display_name || "You").slice(0, 1).toUpperCase()}</div>}<LiveMemberIdentity profile={liveProfiles[userId]} isSelf onOpen={() => openLiveProfile(userId)} /><span>You {party.host_id === userId ? "· Host" : ""}</span></article>
+      {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} profile={liveProfiles[id]} isFollowing={Boolean(followingLiveUsers[id])} followBusy={followBusyIds.includes(id)} onFollow={() => void toggleLiveFollow(id)} onOpenProfile={() => openLiveProfile(id)} audioOnly={party.format === "audio"}/>)}
       {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : party.format === "watch" ? <><Users size={28}/><b>Watch party is ready</b><p>Share a video link above and everyone can watch together.</p></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
     </div><aside className={`party-live-chat ${chatOpen ? "chat-open" : "chat-collapsed"}`} aria-label="Live comments"><div className="party-live-chat-top"><div><MessageCircle size={16}/><b>Live chat</b><span className="party-chat-count">{comments.length}</span></div><button type="button" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Collapse chat" : "Open chat"}>{chatOpen ? <X size={16}/> : <MessageCircle size={18}/>}</button></div>{chatOpen && <><div className="party-live-comments" aria-live="polite" ref={commentsListRef}>{comments.length === 0 ? <p className="party-chat-empty">Say hello 👋 Be kind and keep the conversation flowing.</p> : comments.map(comment => <div className={`party-live-comment ${comment.userId === userId ? "is-own-comment" : ""}`} key={comment.id}><span className="party-comment-avatar">{comment.userId === userId ? "YOU" : comment.userId.slice(0, 2).toUpperCase()}</span><p><b>{comment.userId === userId ? "You" : `Guest ${comment.userId.slice(0, 5)}`}</b><span>{comment.message}</span></p>{comment.userId === userId && <Heart size={13}/>}</div>)}</div><form className="party-live-chat-form" onSubmit={sendComment}><button type="button" className="party-live-react" onClick={reactLive} aria-label="Send a heart reaction"><Heart size={19} fill="currentColor"/></button><input aria-label="Write a comment" value={commentDraft} onChange={event => setCommentDraft(event.target.value)} placeholder="Add a comment…" maxLength={240}/><button type="submit" disabled={!commentDraft.trim() || chatSending} aria-label="Send comment">{chatSending ? <LoaderCircle size={17} className="animate-spin"/> : <Send size={17}/>}</button></form>{chatError && <p className="party-chat-error" role="status">{chatError}</p>}</>}</aside><footer className="party-room-controls party-room-glass">{party.format !== "watch" && <button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>}{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-chat-toggle" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Hide comments" : "Show comments"}><MessageCircle size={20}/><span>Chat</span></button><button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave</span></button></footer></>}
     <p className="party-room-footnote">{party.format === "watch" ? "Supported platform embeds load in the room · YouTube and direct video controls can synchronize" : "Live peer-to-peer media · Camera and microphone access required · Best for small groups"}</p>
   </section>;
 }
 
-function RemoteTile({ userId, stream, audioOnly }: { userId: string; stream: MediaStream; audioOnly: boolean }) {
+function LiveMemberIdentity({ profile, isSelf = false, isFollowing = false, followBusy = false, onFollow, onOpen }: { profile?: LiveProfile; isSelf?: boolean; isFollowing?: boolean; followBusy?: boolean; onFollow?: () => void; onOpen: () => void }) {
+  const name = profile?.display_name || profile?.username || "Live member";
+  return <div className="party-member-identity">
+    <button type="button" className="party-member-avatar" onClick={onOpen} aria-label={`Open ${name}'s profile`} title={`Open ${name}'s profile`}>
+      {profile?.avatar_url ? <img src={profile.avatar_url} alt="" /> : <span>{name.slice(0, 1).toUpperCase()}</span>}
+    </button>
+    <span className="party-member-name">{name}</span>
+    {!isSelf && <button type="button" className={`party-member-follow${isFollowing ? " is-following" : ""}`} onClick={onFollow} disabled={followBusy || !profile} aria-label={isFollowing ? `Unfollow ${name}` : `Follow ${name}`}>{followBusy ? "…" : isFollowing ? "Following" : "Follow"}</button>}
+  </div>;
+}
+
+function RemoteTile({ userId, stream, profile, isFollowing, followBusy, onFollow, onOpenProfile, audioOnly }: { userId: string; stream: MediaStream; profile?: LiveProfile; isFollowing: boolean; followBusy: boolean; onFollow: () => void; onOpenProfile: () => void; audioOnly: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, [stream]);
-  return <article className="party-room-tile"><video ref={videoRef} autoPlay playsInline className={audioOnly ? "camera-disabled" : ""}/>{audioOnly && <div className="party-room-avatar">{userId.slice(0, 2).toUpperCase()}</div>}<span>Guest {userId.slice(0, 5)}</span></article>;
+  return <article className="party-room-tile"><video ref={videoRef} autoPlay playsInline className={audioOnly ? "camera-disabled" : ""}/>{audioOnly && <div className="party-room-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" /> : (profile?.display_name || profile?.username || userId).slice(0, 1).toUpperCase()}</div>}<LiveMemberIdentity profile={profile} isFollowing={isFollowing} followBusy={followBusy} onFollow={onFollow} onOpen={onOpenProfile}/><span>{profile?.display_name || profile?.username || `Guest ${userId.slice(0, 5)}`}</span></article>;
 }
 
 
