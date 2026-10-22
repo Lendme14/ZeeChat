@@ -1779,3 +1779,12 @@ body {
 .party-card-actions{position:relative;z-index:4}
 .party-card-actions button{box-shadow:0 4px 16px #0003}
 @media(max-width:520px){.party-live-card{min-height:300px}.party-card-content h3{font-size:18px}.party-card-art>small{top:64px;left:14px}}
+
+
+/* Clear party format labels on the live thumbnail cards */
+.party-card-badges{position:relative;z-index:3;display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
+.party-type-pill{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid #ffffff38;border-radius:999px;background:rgba(12,14,24,.68);backdrop-filter:blur(12px);color:#fff;font-size:9px;font-weight:900;letter-spacing:.45px;box-shadow:0 3px 12px #0003}
+.party-type-video{border-color:#8b7bff80;background:rgba(76,54,160,.72)}
+.party-type-audio{border-color:#45d7b580;background:rgba(13,105,83,.76)}
+.party-type-watch{border-color:#f6bd6380;background:rgba(140,75,15,.78)}
+@media(max-width:380px){.party-card-badges{gap:4px}.party-type-pill,.party-live-pill{padding:6px 7px;font-size:8px}}
