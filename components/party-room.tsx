@@ -48,7 +48,10 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [watchUrl, setWatchUrl] = useState("");
   const [watchUrlDraft, setWatchUrlDraft] = useState("");
   const [watchError, setWatchError] = useState("");
-  const [youtubeCommand, setYoutubeCommand] = useState<WatchAction | null>(null);\n  const [comments, setComments] = useState<PartyComment[]>([]);\n  const [commentDraft, setCommentDraft] = useState("");\n  const [chatOpen, setChatOpen] = useState(true);
+  const [youtubeCommand, setYoutubeCommand] = useState<WatchAction | null>(null);
+  const [comments, setComments] = useState<PartyComment[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [chatOpen, setChatOpen] = useState(true);
   const watchActionNonce = useRef(0);
 
   const send = useCallback((signal: Signal) => {
@@ -260,7 +263,17 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     const next = !cameraOff; setCameraOff(next);
     streamRef.current?.getVideoTracks().forEach(track => { track.enabled = !next; });
   }
-  function leave() { onClose(); }\n  function sendComment(event: React.FormEvent<HTMLFormElement>) {\n    event.preventDefault();\n    const message = commentDraft.trim().slice(0, 240);\n    if (!message) return;\n    const messageId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${userId}-${Date.now()}`;\n    const comment: PartyComment = { id: messageId, userId, message, at: Date.now() };\n    setComments(current => [...current, comment].slice(-80));\n    setCommentDraft("");\n    send({ kind: "chat", from: userId, message, messageId });\n  }
+  function leave() { onClose(); }
+  function sendComment(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const message = commentDraft.trim().slice(0, 240);
+    if (!message) return;
+    const messageId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${userId}-${Date.now()}`;
+    const comment: PartyComment = { id: messageId, userId, message, at: Date.now() };
+    setComments(current => [...current, comment].slice(-80));
+    setCommentDraft("");
+    send({ kind: "chat", from: userId, message, messageId });
+  }
   function setWatchSource(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = watchUrlDraft.trim();
