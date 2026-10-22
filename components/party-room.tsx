@@ -8,7 +8,7 @@ type PartyRoomInfo = { id: string; title: string; format: "video" | "audio" | "w
 type WatchAction = { kind: "watch-play" | "watch-pause" | "watch-seek"; time: number; nonce: number };
 type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-source" | "watch-play" | "watch-pause" | "watch-seek"; from: string; to?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit; url?: string; time?: number };
 type YTPlayer = { playVideo: () => void; pauseVideo: () => void; seekTo: (seconds: number, allowSeekAhead: boolean) => void; getCurrentTime: () => number; destroy: () => void };
-type YTApi = { Player: new (element: HTMLElement, options: { videoId: string; playerVars?: Record<string, number>; events: { onReady: (event: { target: YTPlayer }) => void; onStateChange: (event: { data: number; target: YTPlayer }) => void } }) => YTPlayer };
+type YTApi = { Player: new (element: HTMLElement, options: { videoId: string; playerVars?: Record<string, number | string>; events: { onReady: (event: { target: YTPlayer }) => void; onStateChange: (event: { data: number; target: YTPlayer }) => void } }) => YTPlayer };
 declare global { interface Window { YT?: YTApi; onYouTubeIframeAPIReady?: () => void } }
 
 function getYouTubeVideoId(value: string): string | null {
