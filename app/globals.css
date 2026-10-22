@@ -1723,3 +1723,11 @@ body {
 @keyframes partyHeartFloat{0%{opacity:0;transform:translateY(22px) scale(.65) rotate(-8deg)}18%{opacity:1;transform:translateY(0) scale(1.08) rotate(4deg)}75%{opacity:1}100%{opacity:0;transform:translateY(-115px) translateX(18px) scale(.86) rotate(12deg)}}
 @media(max-width:420px){.party-floating-reactions{right:18px;bottom:clamp(145px,26dvh,235px)}.party-live-chat-form .party-live-react{flex-basis:38px;width:38px;height:38px;min-height:38px}}
 @media(prefers-reduced-motion:reduce){.party-floating-reaction{animation:none;opacity:1}}
+
+
+.party-chat-error {
+  margin: 0 1rem 0.5rem;
+  color: #fca5a5;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
