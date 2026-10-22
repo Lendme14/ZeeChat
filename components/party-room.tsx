@@ -154,7 +154,9 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
           const signal = payload as Signal;
           if (!signal || signal.from === userId || (signal.to && signal.to !== userId)) return;
           try {
-            if (signal.kind === "watch-source" && party.format === "watch" && signal.url) {
+            if (signal.kind === "chat" && signal.message && signal.messageId) {
+              setComments(current => current.some(item => item.id === signal.messageId) ? current : [...current, { id: signal.messageId!, userId: signal.from, message: signal.message!, at: Date.now() }].slice(-80));
+            } else if (signal.kind === "watch-source" && party.format === "watch" && signal.url) {
               syncingWatchRef.current = true;
               window.setTimeout(() => { syncingWatchRef.current = false; }, 900);
               watchUrlRef.current = signal.url;
