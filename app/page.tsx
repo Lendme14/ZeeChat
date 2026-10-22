@@ -76,13 +76,6 @@ function getDailyCommunityPrompt() {
 }
 
 function localDateKey(date = new Date()) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function getDailyTriviaQuestions() {
-  const key = localDateKey();
-  const seed = Number(key.replace(/-/g, ""));
-  const start = seed % TRIVIA_QUESTIONS.length;
-  return Array.from({ length: 5 }, (_, i) => TRIVIA_QUESTIONS[(start + i) % TRIVIA_QUESTIONS.length]);
-}
-
 export default function HomePage() {
   const [view, setView] = useState<View>("Home");
 
@@ -220,8 +213,6 @@ export default function HomePage() {
     return () => { active = false; };
   }, [userId]);
 
-  const captionBattleHasEntered = Boolean(userId && captionBattleEntries.some(entry => entry.author_id === userId));
-  const sortedCaptionBattleEntries = [...captionBattleEntries].sort((a, b) => captionBattleSort === "top" ? b.vote_count - a.vote_count || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at));
   const unreadConversationCount = inboxConversations.filter(item => item.unreadCount > 0).length;
   const filteredInboxConversations = inboxConversations.filter(item => (inboxFilter !== "unread" || item.unreadCount > 0) && `${item.displayName} ${item.username} ${item.lastMessage}`.toLowerCase().includes(inboxSearch.trim().toLowerCase()));
   const feedReels = reelFeedMode === "saved" ? liveReels.filter(post => savedReelIds.includes(post.id)).sort((a, b) => savedReelIds.indexOf(b.id) - savedReelIds.indexOf(a.id)) : reelFeedMode === "following" ? liveReels.filter(post => followedCreatorIds.has(postAuthors[post.author_id]?.username || "")) : reelFeedMode === "fresh" ? [...liveReels].sort((a, b) => b.created_at.localeCompare(a.created_at)) : [...liveReels].sort((a, b) => { const score = (post: Post) => { const ageHours = Math.max(0, (Date.now() - new Date(post.created_at).getTime()) / 3600000); const engagement = (postLikeCounts[post.id] ?? 0) * 3 + (commentCounts[post.id] ?? 0) * 5 + Math.log1p(postViewCounts[post.id] ?? 0) * 2; return engagement + 12 * Math.exp(-ageHours / 72); }; return score(b) - score(a); });
