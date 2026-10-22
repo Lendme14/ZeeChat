@@ -10,6 +10,7 @@ type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-so
 export default function PartyRoom({ party, userId, onClose }: { party: PartyRoomInfo; userId: string; onClose: () => void }) {
   const localVideo = useRef<HTMLVideoElement>(null);
   const watchVideo = useRef<HTMLVideoElement>(null);
+  const syncingWatchRef = useRef(false);
   const peers = useRef(new Map<string, RTCPeerConnection>());
   const streamRef = useRef<MediaStream | null>(null);
   const pendingIce = useRef(new Map<string, RTCIceCandidateInit[]>());
@@ -83,12 +84,18 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               setWatchUrlDraft(signal.url);
               if (watchVideo.current) { watchVideo.current.pause(); watchVideo.current.src = signal.url; watchVideo.current.load(); }
             } else if (signal.kind === "watch-play" && party.format === "watch") {
+              syncingWatchRef.current = true;
+              window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
               const video = watchVideo.current;
               if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; await video.play().catch(() => undefined); }
             } else if (signal.kind === "watch-pause" && party.format === "watch") {
+              syncingWatchRef.current = true;
+              window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
               const video = watchVideo.current;
               if (video) { if (typeof signal.time === "number") video.currentTime = signal.time; video.pause(); }
             } else if (signal.kind === "watch-seek" && party.format === "watch" && typeof signal.time === "number") {
+              syncingWatchRef.current = true;
+              window.setTimeout(() => { syncingWatchRef.current = false; }, 700);
               if (watchVideo.current) watchVideo.current.currentTime = signal.time;
             } else if (signal.kind === "hello") {
               setParticipants(current => current.includes(signal.from) ? current : [...current, signal.from]);
@@ -174,6 +181,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     }
   }
   function broadcastWatchAction(kind: "watch-play" | "watch-pause" | "watch-seek") {
+    if (syncingWatchRef.current) return;
     const video = watchVideo.current;
     if (!video) return;
     send({ kind, from: userId, time: video.currentTime });
