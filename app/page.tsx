@@ -1700,13 +1700,19 @@ export default function HomePage() {
       const { error: uploadError } = await supabase.storage.from("zeechat-private-drafts").upload(uploadedPath, mediaFile, { contentType: mediaFile.type, cacheControl: "3600", upsert: false });
       if (uploadError) throw uploadError;
       const draftValues = { user_id: userId, caption: caption.trim(), media_path: uploadedPath, media_type: mediaFile.type, media_name: mediaFile.name, filter_name: editorFilter, zoom: editorZoom, crop_ratio: editorRatio, updated_at: new Date().toISOString() };
-      const query = selectedDraftId
-        ? supabase.from("zeechat_reel_drafts").update(draftValues).eq("id", selectedDraftId).eq("user_id", userId)
-        : supabase.from("zeechat_reel_drafts").insert(draftValues);
-      const { data, error } = await query.select("id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at").single();
-      if (error) throw error;
-      setReelDrafts(current => [data as ReelDraft, ...current.filter(draft => draft.id !== data.id)].slice(0, 10));
-      setSelectedDraftId(data.id); setSelectedDraftPath(uploadedPath);
+      const draftFields = "id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at";
+      let savedDraft: ReelDraft;
+      if (selectedDraftId) {
+        const { data, error } = await supabase.from("zeechat_reel_drafts").update(draftValues).eq("id", selectedDraftId).eq("user_id", userId).select(draftFields).single();
+        if (error) throw error;
+        savedDraft = data as ReelDraft;
+      } else {
+        const { data, error } = await supabase.from("zeechat_reel_drafts").insert(draftValues).select(draftFields).single();
+        if (error) throw error;
+        savedDraft = data as ReelDraft;
+      }
+      setReelDrafts(current => [savedDraft, ...current.filter(draft => draft.id !== savedDraft.id)].slice(0, 10));
+      setSelectedDraftId(savedDraft.id); setSelectedDraftPath(uploadedPath);
       let cleanupWarning = false;
       if (previousPath && previousPath !== uploadedPath) {
         const { error: cleanupError } = await supabase.storage.from("zeechat-private-drafts").remove([previousPath]);
