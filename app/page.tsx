@@ -1658,9 +1658,9 @@ export default function HomePage() {
   async function handleStoryFile(file: File | null) {
     if (!file) return;
     if (!userId) { setNotice("Sign in to share a story."); return; }
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    if (!isImage && !isVideo) { setNotice("Choose a photo or video for your story."); return; }
+    const isImage = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type);
+    const isVideo = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"].includes(file.type);
+    if (!isImage && !isVideo) { setNotice("Choose a JPG, PNG, WebP, GIF, MP4, WebM, MOV or OGG file for your story."); return; }
     if (file.size > 30 * 1024 * 1024) { setNotice("Stories must be smaller than 30 MB."); return; }
     const extension = file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
     const path = userId + "/story-" + crypto.randomUUID() + "." + extension.replace(/[^a-z0-9]/g, "");
