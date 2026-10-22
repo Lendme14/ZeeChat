@@ -13,6 +13,37 @@ type YTPlayer = { playVideo: () => void; pauseVideo: () => void; seekTo: (second
 type YTApi = { Player: new (element: HTMLElement, options: { videoId: string; playerVars?: Record<string, number | string>; events: { onReady: (event: { target: YTPlayer }) => void; onStateChange: (event: { data: number; target: YTPlayer }) => void } }) => YTPlayer };
 declare global { interface Window { YT?: YTApi; onYouTubeIframeAPIReady?: () => void } }
 
+function getWatchEmbed(value: string, origin: string): { src: string; label: string } | null {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "").replace(/^m\./, "");
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      const id = parts.find(part => /^\d+$/.test(part));
+      if (id) return { src: "https://player.vimeo.com/video/" + id, label: "Vimeo" };
+    }
+    if (host === "dailymotion.com" || host === "dai.ly") {
+      const index = parts.findIndex(part => part === "video");
+      const id = host === "dai.ly" ? parts[0] : parts[index + 1];
+      if (id) return { src: "https://www.dailymotion.com/embed/video/" + id, label: "Dailymotion" };
+    }
+    if (host === "tiktok.com" && parts.includes("video")) {
+      const id = parts[parts.indexOf("video") + 1];
+      if (id) return { src: "https://www.tiktok.com/player/v1/" + id, label: "TikTok" };
+    }
+    if (host === "twitch.tv" || host === "clips.twitch.tv") {
+      const parent = new URL(origin).hostname;
+      if (host === "clips.twitch.tv" && parts[0]) return { src: "https://clips.twitch.tv/embed?clip=" + encodeURIComponent(parts[0]) + "&parent=" + encodeURIComponent(parent), label: "Twitch" };
+      if (parts[0] === "videos" && parts[1]) return { src: "https://player.twitch.tv/?video=v" + encodeURIComponent(parts[1]) + "&parent=" + encodeURIComponent(parent), label: "Twitch" };
+      if (parts[0] && parts[0] !== "clip" && parts[0] !== "videos") return { src: "https://player.twitch.tv/?channel=" + encodeURIComponent(parts[0]) + "&parent=" + encodeURIComponent(parent), label: "Twitch" };
+      if (parts[0] === "clip" && parts[1]) return { src: "https://clips.twitch.tv/embed?clip=" + encodeURIComponent(parts[1]) + "&parent=" + encodeURIComponent(parent), label: "Twitch" };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getYouTubeVideoId(value: string): string | null {
   try {
     const url = new URL(value);
