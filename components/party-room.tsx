@@ -81,6 +81,8 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
           if (!signal || signal.from === userId || (signal.to && signal.to !== userId)) return;
           try {
             if (signal.kind === "watch-source" && party.format === "watch" && signal.url) {
+              syncingWatchRef.current = true;
+              window.setTimeout(() => { syncingWatchRef.current = false; }, 900);
               setWatchUrl(signal.url);
               setWatchUrlDraft(signal.url);
               if (watchVideo.current) { watchVideo.current.pause(); watchVideo.current.src = signal.url; watchVideo.current.load(); }
@@ -100,7 +102,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               if (watchVideo.current) watchVideo.current.currentTime = signal.time;
             } else if (signal.kind === "hello") {
               setParticipants(current => current.includes(signal.from) ? current : [...current, signal.from]);
-              if (userId.localeCompare(signal.from) < 0) await connectPeer(signal.from, true);
+              if (party.format !== "watch" && userId.localeCompare(signal.from) < 0) await connectPeer(signal.from, true);
             } else if (signal.kind === "offer" && signal.sdp) {
               let pc = peers.current.get(signal.from);
               if (!pc) { await connectPeer(signal.from, false); pc = peers.current.get(signal.from); }
@@ -194,9 +196,9 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     {error ? <div className="party-room-error"><b>{connecting ? "Couldn’t join the room" : "Something needs attention"}</b><p>{error}</p><button type="button" onClick={() => setError("")}>Dismiss</button><button type="button" onClick={leave}>Back to parties</button></div> : <>{party.format === "watch" && <section className="party-watch-panel"><form className="party-watch-source" onSubmit={setWatchSource}><label htmlFor="party-watch-url">Video URL</label><input id="party-watch-url" type="url" value={watchUrlDraft} onChange={event => setWatchUrlDraft(event.target.value)} placeholder="https://example.com/video.mp4" maxLength={2000} /><button type="submit">Share video</button></form>{watchError && <p className="party-watch-error" role="alert">{watchError}</p>}{watchUrl ? <video ref={watchVideo} className="party-watch-player" src={watchUrl} controls playsInline onPlay={() => broadcastWatchAction("watch-play")} onPause={() => broadcastWatchAction("watch-pause")} onSeeked={() => broadcastWatchAction("watch-seek")} /> : <div className="party-watch-empty"><b>Choose a video to watch together</b><p>Share a direct video link such as MP4 or WebM. Playback support depends on the host website.</p></div>}</section>}<div className={"party-room-stage " + (party.format === "audio" || party.format === "watch" ? "audio-stage" : "")}>
       <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">You</div>}<span>You {party.host_id === userId ? "· Host" : ""}</span></article>
       {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} audioOnly={party.format === "audio"}/>)}
-      {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
-    </div><footer className="party-room-controls"><button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave room</span></button></footer></>}
-    <p className="party-room-footnote">Live peer-to-peer media · Camera and microphone access required · Best for small groups</p>
+      {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : party.format === "watch" ? <><Users size={28}/><b>Watch party is ready</b><p>Share a video link above and everyone can watch together.</p></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
+    </div><footer className="party-room-controls">{party.format !== "watch" && <button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>}{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave room</span></button></footer></>}
+    <p className="party-room-footnote">{party.format === "watch" ? "Synchronized playback controls · Direct video links only · Playback support depends on the source" : "Live peer-to-peer media · Camera and microphone access required · Best for small groups"}</p>
   </section>;
 }
 
