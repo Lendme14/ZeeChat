@@ -31,6 +31,13 @@ function getWatchEmbed(value: string, origin: string): { src: string; label: str
       const id = parts[parts.indexOf("video") + 1];
       if (id) return { src: "https://www.tiktok.com/player/v1/" + id, label: "TikTok" };
     }
+    if (host === "instagram.com" && ["reel", "p", "tv"].includes(parts[0] ?? "") && parts[1]) {
+      return { src: "https://www.instagram.com/" + parts[0] + "/" + encodeURIComponent(parts[1]) + "/embed/", label: "Instagram" };
+    }
+    if ((host === "facebook.com" || host === "fb.watch") &&
+      (url.pathname.includes("/watch") || url.pathname.includes("/videos/") || url.pathname.includes("/reel/") || host === "fb.watch")) {
+      return { src: "https://www.facebook.com/plugins/video.php?href=" + encodeURIComponent(url.toString()) + "&show_text=false&width=1280", label: "Facebook" };
+    }
     if (host === "twitch.tv" || host === "clips.twitch.tv") {
       const parent = new URL(origin).hostname;
       if (host === "clips.twitch.tv" && parts[0]) return { src: "https://clips.twitch.tv/embed?clip=" + encodeURIComponent(parts[0]) + "&parent=" + encodeURIComponent(parent), label: "Twitch" };
