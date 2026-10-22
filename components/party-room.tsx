@@ -31,6 +31,10 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const watchUrlRef = useRef("");
   const syncingWatchRef = useRef(false);
   const peers = useRef(new Map<string, RTCPeerConnection>());
+  const iceServersRef = useRef<RTCIceServer[]>([
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun.cloudflare.com:3478" },
+  ]);
   const streamRef = useRef<MediaStream | null>(null);
   const pendingIce = useRef(new Map<string, RTCIceCandidateInit[]>());
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
@@ -53,7 +57,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
 
   const connectPeer = useCallback(async (remoteId: string, initiator: boolean) => {
     if (remoteId === userId || peers.current.has(remoteId)) return;
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun.cloudflare.com:3478" }] });
+    const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peers.current.set(remoteId, pc);
     const stream = streamRef.current;
     stream?.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -120,6 +124,25 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
         if (cancelled) { stream.getTracks().forEach(track => track.stop()); return; }
         streamRef.current = stream;
         if (localVideo.current) localVideo.current.srcObject = stream;
+
+        // TURN credentials are short-lived and generated server-side for this signed-in user.
+        // If TURN is not configured or unavailable, keep the existing STUN-only fallback.
+        try {
+          const response = await fetch("/api/party-ice", { cache: "no-store" });
+          if (response.ok) {
+            const data = await response.json() as { iceServers?: RTCIceServer[] };
+            if (Array.isArray(data.iceServers) && data.iceServers.length) {
+              iceServersRef.current = [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun.cloudflare.com:3478" },
+                ...data.iceServers,
+              ];
+            }
+          }
+        } catch (iceError) {
+          console.warn("Could not load TURN configuration; continuing with STUN", iceError);
+        }
+
         const supabase = createClient();
         channel = supabase.channel("zeechat-party-room-" + party.id, { config: { private: true, broadcast: { self: false } } });
         channelRef.current = channel;
