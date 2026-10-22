@@ -475,16 +475,17 @@ export default function HomePage() {
           .gt("expires_at", new Date().toISOString())
           .order("created_at", { ascending: true }).limit(100);
         if (error) throw error;
-        const rows = data ?? [];
-        const authorIds = [...new Set(rows.map((story: any) => story.user_id))];
+        const rows = (data ?? []) as { id: string; user_id: string; media_url: string; media_type: "image" | "video"; caption: string | null; created_at: string; expires_at: string }[];
+        const authorIds = [...new Set(rows.map(story => story.user_id))];
         const { data: authors, error: authorsError } = authorIds.length
           ? await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", authorIds)
           : { data: [], error: null };
         if (authorsError) throw authorsError;
-        const authorMap = new Map((authors ?? []).map((author: any) => [author.user_id, author]));
-        if (active) setStoryItems(rows.map((story: any) => {
-          const author: any = authorMap.get(story.user_id);
-          return { ...story, authorName: author?.display_name || author?.username || "ZeeChat member", username: author?.username || "member", avatarUrl: author?.avatar_url || null } as ZeeStory;
+        const authorRows = (authors ?? []) as { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null }[];
+        const authorMap = new Map(authorRows.map(author => [author.user_id, author] as const));
+        if (active) setStoryItems(rows.map(story => {
+          const author = authorMap.get(story.user_id);
+          return { ...story, authorName: author?.display_name || author?.username || "ZeeChat member", username: author?.username || "member", avatarUrl: author?.avatar_url || null };
         }));
       } catch (error) {
         if (active) {
