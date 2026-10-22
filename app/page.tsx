@@ -1297,11 +1297,21 @@ export default function HomePage() {
       if (!wasFollowing && creator.is_private) {
         const { data: existingRequest, error: requestLookupError } = await supabase.from("zeechat_follow_requests").select("id,status").eq("requester_id", userId).eq("target_id", creator.user_id).maybeSingle();
         if (requestLookupError) throw requestLookupError;
-        if (existingRequest?.status === "pending") { setPendingFollowRequestUserIds(current => current.includes(creator.user_id) ? current : [...current, creator.user_id]); setNotice("Your follow request is still waiting for approval."); return; }
-        if (existingRequest?.status === "approved") { setNotice("You already have an approved follow request. Refresh your profile."); return; }
-        if (existingRequest?.id) { const { error } = await supabase.from("zeechat_follow_requests").delete().eq("id", existingRequest.id).eq("requester_id", userId); if (error) throw error; }
-        const { error: requestError } = await supabase.from("zeechat_follow_requests").insert({ requester_id: userId, target_id: creator.user_id });
+        if (existingRequest?.status === "pending") {
+          const { error: cancelError } = await supabase.from("zeechat_follow_requests").delete().eq("id", existingRequest.id).eq("requester_id", userId).eq("status", "pending");
+          if (cancelError) throw cancelError;
+          setPendingFollowRequestUserIds(current => current.filter(id => id !== creator.user_id));
+          setNotice("Follow request to @" + username + " cancelled.");
+          return;
+        }
+        const { data: requestResult, error: requestError } = await supabase.rpc("zeechat_request_private_follow", { p_target_id: creator.user_id });
         if (requestError) throw requestError;
+        if (requestResult === "following") {
+          setCreatorFollowState(state => ({ ...state, [username]: true }));
+          setPendingFollowRequestUserIds(current => current.filter(id => id !== creator.user_id));
+          setNotice("You already follow @" + username + ".");
+          return;
+        }
         setPendingFollowRequestUserIds(current => current.includes(creator.user_id) ? current : [...current, creator.user_id]);
         setNotice("Follow request sent to @" + username + ".");
         return;
@@ -1896,7 +1906,7 @@ export default function HomePage() {
           {selectedCreatorProfile?.bio && <p>{selectedCreatorProfile.bio}</p>}
           <div className="creator-preview-actions">
             <button className="create-button" disabled={!selectedCreatorProfile || selectedCreatorProfile.user_id === userId} onClick={() => {if(selectedCreatorProfile) void openLiveConversation(selectedCreatorProfile.user_id,selectedCreatorProfile.username,selectedCreator.initial);}}>Message</button>
-            <button className="outline-button" disabled={followBusy || !selectedCreatorProfile || selectedCreatorProfile.user_id === userId} onClick={() => void toggleCreatorFollow(selectedCreatorProfile?.username || selectedCreator.username)}>{followBusy ? "Please wait…" : creatorFollowState[selectedCreatorProfile?.username || selectedCreator.username] ? "Following" : (selectedCreatorProfile?.is_private && pendingFollowRequestUserIds.includes(selectedCreatorProfile.user_id) ? "Requested" : "Follow")}</button>
+            <button className="outline-button" disabled={followBusy || !selectedCreatorProfile || selectedCreatorProfile.user_id === userId} onClick={() => void toggleCreatorFollow(selectedCreatorProfile?.username || selectedCreator.username)}>{followBusy ? "Please wait…" : creatorFollowState[selectedCreatorProfile?.username || selectedCreator.username] ? "Following" : (selectedCreatorProfile?.is_private && pendingFollowRequestUserIds.includes(selectedCreatorProfile.user_id) ? "Cancel request" : "Follow")}</button>
           </div>
           <div className="profile-stats"><div><b>{selectedCreatorPosts.length}</b><small>Posts</small></div><div><b>{selectedCreatorFollowCounts.followers.toLocaleString()}</b><small>Followers</small></div><div><b>{selectedCreatorFollowCounts.following.toLocaleString()}</b><small>Following</small></div></div>
         </div>
