@@ -62,13 +62,27 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
       const incoming = event.streams[0];
       if (incoming) setRemoteStreams(current => ({ ...current, [remoteId]: incoming }));
     };
+    let disconnectTimer: number | undefined;
+    const discardPeer = () => {
+      if (disconnectTimer !== undefined) window.clearTimeout(disconnectTimer);
+      if (peers.current.get(remoteId) !== pc) return;
+      peers.current.delete(remoteId);
+      pendingIce.current.delete(remoteId);
+      pc.close();
+      setRemoteStreams(current => { const next = { ...current }; delete next[remoteId]; return next; });
+      setParticipants(current => current.filter(id => id !== remoteId));
+      // Re-run peer discovery after the stale connection is removed.
+      window.setTimeout(() => send({ kind: "hello", from: userId }), 500);
+    };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "closed" || pc.connectionState === "disconnected") {
-        if (pc.connectionState !== "disconnected") {
-          pc.close(); peers.current.delete(remoteId);
-          setRemoteStreams(current => { const next = { ...current }; delete next[remoteId]; return next; });
-          setParticipants(current => current.filter(id => id !== remoteId));
-        }
+      if (pc.connectionState === "connected") {
+        if (disconnectTimer !== undefined) window.clearTimeout(disconnectTimer);
+        disconnectTimer = undefined;
+      } else if (pc.connectionState === "disconnected") {
+        // Give ICE a short grace period to recover from Wi-Fi or mobile-network handoffs.
+        if (disconnectTimer === undefined) disconnectTimer = window.setTimeout(discardPeer, 8000);
+      } else if (pc.connectionState === "failed") {
+        discardPeer();
       }
     };
     if (initiator) {
