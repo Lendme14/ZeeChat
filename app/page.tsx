@@ -1269,7 +1269,7 @@ export default function HomePage() {
       // If saving the profile failed after the file upload, remove the unused object to avoid orphaned uploads.
       if (uploadedPath) {
         try {
-          await createClient().storage.from("zeechat-media").remove([uploadedPath]);
+          await createClient().storage.from("zeechat-private-drafts").remove([uploadedPath]);
         } catch (cleanupError) {
           console.warn("Could not clean up failed " + kind + " upload", cleanupError);
         }
@@ -1681,7 +1681,7 @@ export default function HomePage() {
       const supabase = createClient();
       const extension = mediaFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
       uploadedPath = userId + "/drafts/" + crypto.randomUUID() + "." + extension;
-      const { error: uploadError } = await supabase.storage.from("zeechat-media").upload(uploadedPath, mediaFile, { contentType: mediaFile.type, cacheControl: "3600", upsert: false });
+      const { error: uploadError } = await supabase.storage.from("zeechat-private-drafts").upload(uploadedPath, mediaFile, { contentType: mediaFile.type, cacheControl: "3600", upsert: false });
       if (uploadError) throw uploadError;
       const { data, error } = await supabase.from("zeechat_reel_drafts").insert({ user_id: userId, caption: caption.trim(), media_path: uploadedPath, media_type: mediaFile.type, media_name: mediaFile.name, filter_name: editorFilter, zoom: editorZoom, crop_ratio: editorRatio }).select("id,user_id,caption,media_path,media_type,media_name,filter_name,zoom,crop_ratio,created_at,updated_at").single();
       if (error) throw error;
@@ -1698,7 +1698,7 @@ export default function HomePage() {
     if (!userId || reelDraftBusy) return;
     setReelDraftBusy(true);
     try {
-      const { data, error } = await createClient().storage.from("zeechat-media").download(draft.media_path);
+      const { data, error } = await createClient().storage.from("zeechat-private-drafts").download(draft.media_path);
       if (error || !data) throw error || new Error("The saved video could not be downloaded.");
       const file = new File([data], draft.media_name, { type: draft.media_type, lastModified: Date.now() });
       setMediaFile(file); setCaption(draft.caption); setPostKind("reel"); setEditorFilter(draft.filter_name); setEditorZoom(Number(draft.zoom)); setEditorRatio(draft.crop_ratio); setSelectedDraftId(draft.id); setSelectedDraftPath(draft.media_path);
@@ -1714,7 +1714,7 @@ export default function HomePage() {
       const supabase = createClient();
       const { error } = await supabase.from("zeechat_reel_drafts").delete().eq("id", draft.id).eq("user_id", userId);
       if (error) throw error;
-      const { error: storageError } = await supabase.storage.from("zeechat-media").remove([draft.media_path]);
+      const { error: storageError } = await supabase.storage.from("zeechat-private-drafts").remove([draft.media_path]);
       setReelDrafts(current => current.filter(item => item.id !== draft.id));
       if (selectedDraftId === draft.id) { setSelectedDraftId(null); setSelectedDraftPath(null); }
       setNotice(storageError ? "Draft deleted, but its stored video needs cleanup." : "Reel draft deleted.");
@@ -1785,7 +1785,7 @@ export default function HomePage() {
       if (selectedDraftId) {
         try {
           const { error: draftDeleteError } = await supabase.from("zeechat_reel_drafts").delete().eq("id", selectedDraftId).eq("user_id", userId);
-          if (!draftDeleteError && selectedDraftPath) await supabase.storage.from("zeechat-media").remove([selectedDraftPath]);
+          if (!draftDeleteError && selectedDraftPath) await supabase.storage.from("zeechat-private-drafts").remove([selectedDraftPath]);
           setReelDrafts(current => current.filter(draft => draft.id !== selectedDraftId));
         } catch (draftCleanupError) { console.warn("Published Reel, but draft cleanup failed", draftCleanupError); }
       }
