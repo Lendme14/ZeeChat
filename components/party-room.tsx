@@ -55,6 +55,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   useEffect(() => {
     let cancelled = false;
     const peerConnections = peers.current;
+    const pendingCandidates = pendingIce.current;
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
     async function start() {
       try {
@@ -79,8 +80,8 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               if (!pc) { await connectPeer(signal.from, false); pc = peers.current.get(signal.from); }
               if (!pc) return;
               await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-              const queuedCandidates = pendingIce.current.get(signal.from) ?? [];
-              pendingIce.current.delete(signal.from);
+              const queuedCandidates = pendingCandidates.get(signal.from) ?? [];
+              pendingCandidates.delete(signal.from);
               for (const candidate of queuedCandidates) await pc.addIceCandidate(new RTCIceCandidate(candidate));
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
@@ -89,20 +90,20 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
               const pc = peers.current.get(signal.from);
               if (pc && !pc.currentRemoteDescription) {
                 await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                const queuedCandidates = pendingIce.current.get(signal.from) ?? [];
-                pendingIce.current.delete(signal.from);
+                const queuedCandidates = pendingCandidates.get(signal.from) ?? [];
+                pendingCandidates.delete(signal.from);
                 for (const candidate of queuedCandidates) await pc.addIceCandidate(new RTCIceCandidate(candidate));
               }
             } else if (signal.kind === "ice" && signal.candidate) {
               const pc = peers.current.get(signal.from);
               if (pc?.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
               else {
-                const queued = pendingIce.current.get(signal.from) ?? [];
+                const queued = pendingCandidates.get(signal.from) ?? [];
                 queued.push(signal.candidate);
-                pendingIce.current.set(signal.from, queued);
+                pendingCandidates.set(signal.from, queued);
               }
             } else if (signal.kind === "leave") {
-              peers.current.get(signal.from)?.close(); peers.current.delete(signal.from); pendingIce.current.delete(signal.from);
+              peers.current.get(signal.from)?.close(); peers.current.delete(signal.from); pendingCandidates.delete(signal.from);
               setRemoteStreams(current => { const next = { ...current }; delete next[signal.from]; return next; });
               setParticipants(current => current.filter(id => id !== signal.from));
             }
@@ -126,7 +127,7 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
     return () => {
       cancelled = true;
       send({ kind: "leave", from: userId });
-      peerConnections.forEach(pc => pc.close()); peerConnections.clear(); pendingIce.current.clear();
+      peerConnections.forEach(pc => pc.close()); peerConnections.clear(); pendingCandidates.clear();
       streamRef.current?.getTracks().forEach(track => track.stop()); streamRef.current = null;
       if (channel) void createClient().removeChannel(channel);
       channelRef.current = null;
