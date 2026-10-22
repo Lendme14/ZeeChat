@@ -33,12 +33,7 @@ drop policy if exists "Authenticated users discover public parties and their own
 create policy "Authenticated users discover public parties and their own"
   on public.zeechat_parties for select to authenticated
   using (
-    access = 'public'
-    or host_id = (select auth.uid())
-    or exists (
-      select 1 from public.zeechat_party_members member
-      where member.party_id = id and member.user_id = (select auth.uid())
-    )
+    access = 'public' or host_id = (select auth.uid())
   );
 
 drop policy if exists "Authenticated users create their own parties" on public.zeechat_parties;
