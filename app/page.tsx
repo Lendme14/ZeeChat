@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, Bell, Bookmark, CalendarClock, Check, CheckCheck, Compass, Eye, Film, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Reply, Search, Send, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Bell, Bookmark, CalendarClock, Check, CheckCheck, Compass, Eye, Film, Heart, LockKeyhole, LogOut, MessageCircle, Mic, MoreHorizontal, Paperclip, Plus, Reply, Search, Send, Settings2, ShieldCheck, Smile, Sparkles, Users, UserRound, Video, Volume2, VolumeX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import PartyRoom from "@/components/party-room";
 
@@ -33,6 +33,8 @@ type PostComment = { id: string; post_id: string; author_id: string; body: strin
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; };
 type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null; reply_to_id?: string | null };
 type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like" | "caption_vote"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
+type ZeeNotificationPreferences = { messages: boolean; follows: boolean; comments: boolean; likes: boolean; community: boolean };
+const DEFAULT_NOTIFICATION_PREFERENCES: ZeeNotificationPreferences = { messages: true, follows: true, comments: true, likes: true, community: true };
 type InboxConversation = { id: string; otherUserId: string; username: string; displayName: string; avatarUrl: string | null; lastMessage: string; lastAt: string | null; unreadCount: number };
 const sampleReels = [
   { user: "mira.moves", caption: "POV: the group chat finally makes it outside 😂✨", tags: "#goodvibes #weekendenergy", sound: "original audio · Mira", image: "photo-1533174072545-7a4b6ad7a6c3", likes: "24.8K", comments: "1,204", initial: "M" },
@@ -181,6 +183,9 @@ export default function HomePage() {
   const [notice, setNotice] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<ZeeNotification[]>([]);
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<ZeeNotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [notificationPreferencesSaving, setNotificationPreferencesSaving] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [activeChat, setActiveChat] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -506,6 +511,7 @@ export default function HomePage() {
 
   const selectedCreatorUsername = selectedCreator?.username;
   const activeStory = storyItems.find(story => story.id === activeStoryId) ?? null;
+  const visibleNotifications = notifications.filter(item => notificationPreferences[item.kind === "message" ? "messages" : item.kind === "follow" ? "follows" : item.kind === "comment" ? "comments" : item.kind === "like" ? "likes" : "community"]);
   const storyGroups = storyItems.reduce((groups, story) => {
     const existing = groups.find(group => group.user_id === story.user_id);
     if (existing) existing.stories.push(story);
@@ -782,6 +788,8 @@ export default function HomePage() {
     if (!userId) {
       setNotifications([]);
       setUnreadMessageCount(0);
+      setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
+      setNotificationSettingsOpen(false);
       return;
     }
     const supabase = createClient();
@@ -793,6 +801,24 @@ export default function HomePage() {
         .is("read_at", null);
       if (active && !error) setUnreadMessageCount(count ?? 0);
     };
+    const loadNotificationPreferences = async () => {
+      const { data, error } = await supabase.from("zeechat_notification_preferences")
+        .select("messages,follows,comments,likes,community")
+        .eq("user_id", userId).maybeSingle();
+      if (!active) return;
+      if (error) {
+        console.error("Unable to load notification preferences", error);
+        return;
+      }
+      if (data) setNotificationPreferences({
+        messages: data.messages !== false,
+        follows: data.follows !== false,
+        comments: data.comments !== false,
+        likes: data.likes !== false,
+        community: data.community !== false,
+      });
+      else setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
+    };
     const loadNotifications = async () => {
       const { data, error } = await supabase.from("zeechat_notifications")
         .select("id,recipient_id,actor_id,kind,title,body,entity_id,source_id,created_at,read_at")
@@ -803,6 +829,7 @@ export default function HomePage() {
       if (error) console.error("Unable to load notifications", error);
     };
     void loadNotifications();
+    void loadNotificationPreferences();
     void refreshUnreadMessages();
     const channel = supabase.channel("zeechat-user-activity-" + userId)
       .on("postgres_changes", {
@@ -1076,6 +1103,26 @@ export default function HomePage() {
         if (replyToId) setReplyToMessage(optimistic);
         setNotice(error instanceof Error ? `Message not sent: ${error.message}` : "Message not sent. Check your connection and try again.");
       }
+    }
+  }
+
+  async function updateNotificationPreference<K extends keyof ZeeNotificationPreferences>(key: K, value: boolean) {
+    if (!userId) { setNotice("Sign in to save notification preferences."); return; }
+    const previous = notificationPreferences;
+    const next = { ...previous, [key]: value };
+    setNotificationPreferences(next);
+    setNotificationPreferencesSaving(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("zeechat_notification_preferences").upsert({
+        user_id: userId, ...next, updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+      if (error) throw error;
+    } catch (error) {
+      setNotificationPreferences(previous);
+      setNotice(error instanceof Error ? "Preferences were not saved: " + error.message : "Preferences were not saved. Try again.");
+    } finally {
+      setNotificationPreferencesSaving(false);
     }
   }
 
@@ -1655,8 +1702,8 @@ export default function HomePage() {
 
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {notificationsOpen && <section className="notification-center" aria-label="Notifications" aria-live="polite">
-        <header className="notification-center-header"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>Notifications</h2><p>{notifications.filter(item => !item.read_at).length ? `${notifications.filter(item => !item.read_at).length} unread` : "You’re all caught up"}</p></div><div className="notification-center-actions">{notifications.some(item => !item.read_at) && <button type="button" onClick={() => void markAllNotificationsRead()}>Mark all read</button>}<button type="button" className="notification-close" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}>×</button></div></header>
-        {!userId ? <p className="notification-empty">Sign in to see your notifications.</p> : notifications.length ? <div className="notification-list">{notifications.map(item => <button type="button" key={item.id} className={`notification-item ${item.read_at ? "" : "is-unread"}`} onClick={() => void openNotification(item)}><span className={`notification-kind-icon notification-kind-${item.kind}`}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : item.kind === "caption_vote" ? <Sparkles size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">No notifications yet. New messages, follows, comments, likes and Caption Battle votes will show up here.</p>}
+        <header className="notification-center-header"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>{notificationSettingsOpen ? "Notification preferences" : "Notifications"}</h2><p>{notificationSettingsOpen ? "Choose which in-app alerts appear here." : visibleNotifications.filter(item => !item.read_at).length ? visibleNotifications.filter(item => !item.read_at).length + " unread" : "You’re all caught up"}</p></div><div className="notification-center-actions">{!notificationSettingsOpen && visibleNotifications.some(item => !item.read_at) && <button type="button" onClick={() => void markAllNotificationsRead()}>Mark all read</button>}<button type="button" className="notification-preferences-button" aria-label={notificationSettingsOpen ? "Back to notifications" : "Notification preferences"} title="Notification preferences" onClick={() => setNotificationSettingsOpen(value => !value)}><Settings2 size={17}/></button><button type="button" className="notification-close" aria-label="Close notifications" onClick={() => {setNotificationsOpen(false);setNotificationSettingsOpen(false);}}>×</button></div></header>
+        {!userId ? <p className="notification-empty">Sign in to manage your notification preferences.</p> : notificationSettingsOpen ? <div className="notification-preferences-list">{([{key:"messages",title:"Messages",description:"New direct messages"},{key:"follows",title:"New followers",description:"When someone follows you"},{key:"comments",title:"Comments",description:"Comments on your posts and Reels"},{key:"likes",title:"Likes",description:"Likes and reactions to your content"},{key:"community",title:"Community activity",description:"Caption Battle votes and other community updates"}] as {key:keyof ZeeNotificationPreferences;title:string;description:string}[]).map(option=><label className="notification-preference-row" key={option.key}><span><b>{option.title}</b><small>{option.description}</small></span><input type="checkbox" checked={notificationPreferences[option.key]} disabled={notificationPreferencesSaving} onChange={event=>void updateNotificationPreference(option.key,event.target.checked)}/></label>)}<p className="notification-preferences-note">{notificationPreferencesSaving ? "Saving preferences…" : "These preferences sync to your account and apply to the in-app notification list."}</p></div> : visibleNotifications.length ? <div className="notification-list">{visibleNotifications.map(item => <button type="button" key={item.id} className={"notification-item " + (item.read_at ? "" : "is-unread")} onClick={() => void openNotification(item)}><span className={"notification-kind-icon notification-kind-" + item.kind}>{item.kind === "message" ? <MessageCircle size={18}/> : item.kind === "follow" ? <Users size={18}/> : item.kind === "comment" ? <MessageCircle size={18}/> : item.kind === "caption_vote" ? <Sparkles size={18}/> : <Heart size={18}/>}</span><span className="notification-item-copy"><b>{item.title}</b><span>{item.body}</span><small>{new Date(item.created_at).toLocaleString()}</small></span>{!item.read_at && <i className="notification-unread-dot" aria-label="Unread"/>}</button>)}</div> : <p className="notification-empty">{notifications.length ? "All notifications are hidden by your preferences. Open preferences to show more activity." : "No notifications yet. New messages, follows, comments, likes and Caption Battle votes will show up here."}</p>}
       </section>}
       {view === "Home" && <section className="home-feed-view"><div className="home-feed-heading"><div><span className="eyebrow">YOUR COMMUNITY</span><h1>Home <span className="home-heading-chevron">⌄</span></h1></div><div className="home-feed-actions"><button className="home-watch-reels" onClick={() => setView("Reels")}><Video size={16}/><span>Reels</span></button><button aria-label="Search" onClick={() => setView("Discover")}><Search size={19}/></button><button className="home-notification-button" aria-label={`Notifications${notifications.filter(item => !item.read_at).length ? `, ${notifications.filter(item => !item.read_at).length} unread` : ""}`} onClick={() => setNotificationsOpen(value => !value)}><Bell size={19}/>{notifications.some(item => !item.read_at) && <span className="notification-count-badge">{notifications.filter(item => !item.read_at).length > 99 ? "99+" : notifications.filter(item => !item.read_at).length}</span>}</button></div></div><div className="home-story-strip"><button className="home-story-add" disabled={storyUploading} onClick={() => storyPickerRef.current?.click()}><span>{storyUploading ? "…" : "＋"}</span><small>{storyUploading ? "Uploading" : "Your story"}</small></button><input ref={storyPickerRef} className="story-file-input" type="file" accept="image/*,video/*" onChange={event => { const file = event.target.files?.[0] ?? null; event.target.value = ""; void handleStoryFile(file); }} />{storyGroups.map((group,i)=><button key={group.user_id} className="home-story" onClick={() => setActiveStoryId(group.stories[0]?.id ?? null)} aria-label={"View " + group.authorName + " story"}><span className={"home-story-avatar tone-"+(i%6)}>{group.avatarUrl ? <Image src={group.avatarUrl} alt="" width={48} height={48} unoptimized/> : (group.authorName[0] || "Z").toUpperCase()}</span><small>{group.user_id === userId ? "You" : group.authorName.split(" ")[0]}</small></button>)}</div>{activeStory && <div className="story-viewer-backdrop" role="presentation" onClick={() => setActiveStoryId(null)}><section className="story-viewer" role="dialog" aria-modal="true" aria-label={activeStory.authorName + " story"} onClick={event => event.stopPropagation()}><div className="story-viewer-progress"><span /></div><header><div className="story-viewer-author"><span className="story-viewer-avatar">{activeStory.avatarUrl ? <Image src={activeStory.avatarUrl} alt="" width={36} height={36} unoptimized/> : activeStory.authorName[0]}</span><div><b>{activeStory.authorName}</b><small>{new Date(activeStory.created_at).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</small></div></div><button type="button" aria-label="Close story" onClick={() => setActiveStoryId(null)}>×</button></header><div className="story-viewer-media">{activeStory.media_type === "video" ? <video src={activeStory.media_url} controls autoPlay playsInline /> : <Image src={activeStory.media_url} alt={activeStory.caption || "Story"} fill unoptimized sizes="(max-width: 700px) 100vw, 420px" />}</div>{activeStory.caption && <p className="story-viewer-caption">{activeStory.caption}</p>}<footer><span>@{activeStory.username}</span><div><button type="button" disabled={storyItems.findIndex(story => story.id === activeStory.id) <= 0} onClick={() => setActiveStoryId(storyItems[storyItems.findIndex(story => story.id === activeStory.id)-1]?.id ?? activeStory.id)}>Previous</button><button type="button" disabled={storyItems.findIndex(story => story.id === activeStory.id) >= storyItems.length-1} onClick={() => setActiveStoryId(storyItems[storyItems.findIndex(story => story.id === activeStory.id)+1]?.id ?? activeStory.id)}>Next</button></div></footer></section></div>}<div className="daily-prompt-card"><div className="daily-prompt-topline"><span className="daily-prompt-icon"><Sparkles size={18}/></span><span className="eyebrow">TODAY&apos;S COMMUNITY PROMPT</span><span className="daily-prompt-refresh">A fresh prompt every day</span></div><h2>{getDailyCommunityPrompt()}</h2><p>Start a conversation, share your perspective, and give someone a reason to reply.</p><div className="daily-prompt-actions"><button className="daily-prompt-answer" onClick={() => { setCaption(`Today’s ZeeChat prompt: ${getDailyCommunityPrompt()}\n\nMy take: `); setPostKind("post"); setMediaFile(null); setCreateOpen(true); }}>Answer with a post <MessageCircle size={16}/></button><button className="daily-prompt-share" onClick={() => void shareDailyPrompt()}>Invite a friend <Send size={15}/></button></div></div><section className="live-feed"><div className="feed-heading"><div><span className="eyebrow">FROM THE COMMUNITY</span><h2>Fresh on ZeeChat</h2></div><span>{posts.length} posts</span></div>{posts.length ? posts.map(p => <article className="post-card" key={p.id} data-post-id={p.id}><div className="post-avatar">{postAuthors[p.author_id]?.avatar_url ? <img className="post-avatar-image" src={postAuthors[p.author_id].avatar_url!} alt="" /> : (postAuthors[p.author_id]?.display_name?.[0] || postAuthors[p.author_id]?.username?.[0] || "z").toUpperCase()}</div><div className="post-body"><b>{postAuthors[p.author_id]?.display_name || postAuthors[p.author_id]?.username || "ZeeChat member"} <span className="post-username">{postAuthors[p.author_id]?.username ? `@${postAuthors[p.author_id].username}` : ""}</span></b><div className="post-meta-row"><small>{new Date(p.created_at).toLocaleString()}</small>{p.author_id === userId && <ContentActionMenu label="post" disabled={busy} onDelete={() => void deletePost(p)} />}</div>{p.caption && <><p>{expandedCaptions.includes(p.id) || p.caption.length <= 240 ? p.caption : p.caption.slice(0, 240).trimEnd() + "…"}</p>{p.caption.length > 240 && <button type="button" className="post-caption-toggle" onClick={() => setExpandedCaptions(current => current.includes(p.id) ? current.filter(id => id !== p.id) : [...current, p.id])}>{expandedCaptions.includes(p.id) ? "Show less" : "Read more"}</button>}</>}{p.post_type === "reel" && p.media_url ? <button type="button" className="home-reel-thumbnail" onClick={() => { setActiveReelPostId(p.id); setView("Reels"); }} aria-label="Play Reel"><img className="community-post-image" src={p.thumbnail_url || p.media_url} alt="Reel thumbnail" loading="lazy" /><span className="home-reel-play"><Video size={25} fill="currentColor"/></span><small>PLAY REEL</small></button> : p.media_url && p.post_type !== "video" ? <img className="community-post-image" src={p.media_url} alt="Image shared in a ZeeChat post" loading="lazy" /> : null}<div className="post-actions"><button className={likedPostIds.includes(p.id) ? "post-like liked" : "post-like"} disabled={likeBusyIds.includes(p.id)} aria-label={likedPostIds.includes(p.id) ? "Unlike post" : "Like post"} onClick={() => togglePostLike(p.id)}><Heart size={16} fill={likedPostIds.includes(p.id) ? "currentColor" : "none"}/><span>{postLikeCounts[p.id] ?? 0}</span></button><button className="post-like" onClick={() => toggleComments(p.id)}><MessageCircle size={16}/><span>{commentCounts[p.id] ?? 0}</span><span>{openCommentPostIds.includes(p.id) ? "Hide comments" : "Comments"}</span></button><span className="post-view-count" aria-label={`${(postViewCounts[p.id] ?? 0).toLocaleString()} views`}><Eye size={16}/><span>{(postViewCounts[p.id] ?? 0).toLocaleString()}</span></span></div>{openCommentPostIds.includes(p.id) && <div className="comments-panel">{(commentsByPost[p.id] ?? []).map(comment => <div className="comment-row" key={comment.id}><span className="comment-avatar">z</span><div><small>{comment.author_id === userId ? "You" : "Community member"} · {new Date(comment.created_at).toLocaleString()}</small>{comment.author_id === userId && <ContentActionMenu label="comment" onDelete={() => void deleteComment(comment)} />}<p>{comment.body}</p></div></div>)}<form className="comment-form" onSubmit={event => { event.preventDefault(); void submitComment(p.id); }}><input aria-label="Write a comment" maxLength={1000} value={commentDrafts[p.id] ?? ""} onChange={event => setCommentDrafts(current => ({ ...current, [p.id]: event.target.value }))} placeholder="Add a kind comment…" /><button disabled={commentBusyIds.includes(p.id) || !(commentDrafts[p.id] ?? "").trim()} type="submit">{commentBusyIds.includes(p.id) ? "Posting…" : "Send"}</button></form></div>}</div></article>) : <p className="muted">No community posts yet. Be the first to share something.</p>}</section></section>}
       {view === "Reels" && <section className="reels-view immersive-reels">
