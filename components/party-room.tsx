@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 type PartyRoomInfo = { id: string; title: string; format: "video" | "audio" | "watch"; host_id: string };
 type WatchAction = { kind: "watch-play" | "watch-pause" | "watch-seek"; time: number; nonce: number };
 type PartyComment = { id: string; userId: string; message: string; at: number };
-type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-source" | "watch-play" | "watch-pause" | "watch-seek" | "chat"; from: string; to?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit; url?: string; time?: number; message?: string; messageId?: string };
+type FloatingReaction = { id: string; emoji: string };
+type Signal = { kind: "hello" | "offer" | "answer" | "ice" | "leave" | "watch-source" | "watch-play" | "watch-pause" | "watch-seek" | "chat" | "reaction"; from: string; to?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit; url?: string; time?: number; message?: string; messageId?: string; reaction?: string };
 type YTPlayer = { playVideo: () => void; pauseVideo: () => void; seekTo: (seconds: number, allowSeekAhead: boolean) => void; getCurrentTime: () => number; destroy: () => void };
 type YTApi = { Player: new (element: HTMLElement, options: { videoId: string; playerVars?: Record<string, number | string>; events: { onReady: (event: { target: YTPlayer }) => void; onStateChange: (event: { data: number; target: YTPlayer }) => void } }) => YTPlayer };
 declare global { interface Window { YT?: YTApi; onYouTubeIframeAPIReady?: () => void } }
@@ -52,7 +53,25 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   const [comments, setComments] = useState<PartyComment[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [chatOpen, setChatOpen] = useState(true);
+  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
   const watchActionNonce = useRef(0);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    commentsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [comments, chatOpen]);
+
+  function showReaction(emoji = "💜") {
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    setFloatingReactions(current => [...current, { id, emoji }].slice(-8));
+    window.setTimeout(() => setFloatingReactions(current => current.filter(item => item.id !== id)), 1900);
+  }
+
+  function reactLive() {
+    showReaction("💜");
+    send({ kind: "reaction", from: userId, reaction: "💜" });
+  }
 
   const send = useCallback((signal: Signal) => {
     const channel = channelRef.current;
@@ -154,7 +173,9 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
           const signal = payload as Signal;
           if (!signal || signal.from === userId || (signal.to && signal.to !== userId)) return;
           try {
-            if (signal.kind === "chat" && signal.message && signal.messageId) {
+            if (signal.kind === "reaction") {
+              showReaction(signal.reaction === "❤️" ? "❤️" : "💜");
+            } else if (signal.kind === "chat" && signal.message && signal.messageId) {
               setComments(current => current.some(item => item.id === signal.messageId) ? current : [...current, { id: signal.messageId!, userId: signal.from, message: signal.message!, at: Date.now() }].slice(-80));
             } else if (signal.kind === "watch-source" && party.format === "watch" && signal.url) {
               syncingWatchRef.current = true;
@@ -298,12 +319,13 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
   }
 
   return <section className={`party-room-overlay party-room-fullscreen party-room-${party.format}`} role="dialog" aria-modal="true" aria-label={party.title}>
+    <div className="party-floating-reactions" aria-hidden="true">{floatingReactions.map(item => <span key={item.id} className="party-floating-reaction">{item.emoji}</span>)}</div>
     <header className="party-room-header party-room-glass"><div className="party-room-heading"><span className="party-room-live"><span className="party-live-dot" /> LIVE</span><h2>{party.title}</h2><p><Users size={14}/> {participants.length + 1} here <span className="party-room-type">{party.format === "audio" ? "Audio room" : party.format === "watch" ? "Watch party" : "Video room"}</span></p></div><button type="button" className="party-room-leave" onClick={leave} aria-label="Leave live room"><X size={18}/></button></header>
     {error ? <div className="party-room-error"><b>{connecting ? "Couldn’t join the room" : "Something needs attention"}</b><p>{error}</p><button type="button" onClick={() => setError("")}>Dismiss</button><button type="button" onClick={leave}>Back to parties</button></div> : <>{party.format === "watch" && <section className="party-watch-panel"><form className="party-watch-source" onSubmit={setWatchSource}><label htmlFor="party-watch-url">Video URL</label><input id="party-watch-url" type="url" value={watchUrlDraft} onChange={event => setWatchUrlDraft(event.target.value)} placeholder="YouTube link or direct MP4/WebM URL" maxLength={2000} /><button type="submit">Share video</button></form>{watchError && <p className="party-watch-error" role="alert">{watchError}</p>}{watchUrl ? (getYouTubeVideoId(watchUrl) ? <YouTubeWatchPlayer key={getYouTubeVideoId(watchUrl)!} videoId={getYouTubeVideoId(watchUrl)!} command={youtubeCommand} onAction={(kind, time) => send({ kind, from: userId, time })} /> : <video ref={watchVideo} className="party-watch-player" src={watchUrl} controls playsInline onPlay={() => broadcastWatchAction("watch-play")} onPause={() => broadcastWatchAction("watch-pause")} onSeeked={() => broadcastWatchAction("watch-seek")} />) : <div className="party-watch-empty"><b>Choose a video to watch together</b><p>Paste a YouTube watch/share link, or a direct MP4/WebM video URL.</p></div>}</section>}<div className={"party-room-stage " + (party.format === "audio" || party.format === "watch" ? "audio-stage" : "")}>
       <article className="party-room-tile local-tile"><video ref={localVideo} autoPlay muted playsInline className={cameraOff ? "camera-disabled" : ""}/>{cameraOff && <div className="party-room-avatar">You</div>}<span>You {party.host_id === userId ? "· Host" : ""}</span></article>
       {Object.entries(remoteStreams).map(([id, stream]) => <RemoteTile key={id} userId={id} stream={stream} audioOnly={party.format === "audio"}/>)}
       {!Object.keys(remoteStreams).length && <div className="party-room-waiting">{connecting ? <><LoaderCircle size={26} className="party-spin"/><b>Connecting to your party…</b></> : party.format === "watch" ? <><Users size={28}/><b>Watch party is ready</b><p>Share a video link above and everyone can watch together.</p></> : <><Users size={28}/><b>You’re first in the room</b><p>Share the party with guests so they can join.</p></>}</div>}
-    </div><aside className={`party-live-chat ${chatOpen ? "chat-open" : "chat-collapsed"}`} aria-label="Live comments"><div className="party-live-chat-top"><div><MessageCircle size={16}/><b>Live chat</b><span className="party-chat-count">{comments.length}</span></div><button type="button" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Collapse chat" : "Open chat"}>{chatOpen ? <X size={16}/> : <MessageCircle size={18}/>}</button></div>{chatOpen && <><div className="party-live-comments" aria-live="polite">{comments.length === 0 ? <p className="party-chat-empty">Say hello 👋 Be kind and keep the conversation flowing.</p> : comments.map(comment => <div className={`party-live-comment ${comment.userId === userId ? "is-own-comment" : ""}`} key={comment.id}><span className="party-comment-avatar">{comment.userId === userId ? "YOU" : comment.userId.slice(0, 2).toUpperCase()}</span><p><b>{comment.userId === userId ? "You" : `Guest ${comment.userId.slice(0, 5)}`}</b><span>{comment.message}</span></p>{comment.userId === userId && <Heart size={13}/>}</div>)}</div><form className="party-live-chat-form" onSubmit={sendComment}><input aria-label="Write a comment" value={commentDraft} onChange={event => setCommentDraft(event.target.value)} placeholder="Add a comment…" maxLength={240}/><button type="submit" disabled={!commentDraft.trim()} aria-label="Send comment"><Send size={17}/></button></form></>}</aside><footer className="party-room-controls party-room-glass">{party.format !== "watch" && <button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>}{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-chat-toggle" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Hide comments" : "Show comments"}><MessageCircle size={20}/><span>Chat</span></button><button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave</span></button></footer></>}
+    </div><aside className={`party-live-chat ${chatOpen ? "chat-open" : "chat-collapsed"}`} aria-label="Live comments"><div className="party-live-chat-top"><div><MessageCircle size={16}/><b>Live chat</b><span className="party-chat-count">{comments.length}</span></div><button type="button" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Collapse chat" : "Open chat"}>{chatOpen ? <X size={16}/> : <MessageCircle size={18}/>}</button></div>{chatOpen && <><div className="party-live-comments" aria-live="polite">{comments.length === 0 ? <p className="party-chat-empty">Say hello 👋 Be kind and keep the conversation flowing.</p> : comments.map(comment => <div className={`party-live-comment ${comment.userId === userId ? "is-own-comment" : ""}`} key={comment.id}><span className="party-comment-avatar">{comment.userId === userId ? "YOU" : comment.userId.slice(0, 2).toUpperCase()}</span><p><b>{comment.userId === userId ? "You" : `Guest ${comment.userId.slice(0, 5)}`}</b><span>{comment.message}</span></p>{comment.userId === userId && <Heart size={13}/>}</div>)}</div><div ref={commentsEndRef} /><form className="party-live-chat-form" onSubmit={sendComment}><button type="button" className="party-live-react" onClick={reactLive} aria-label="Send a heart reaction"><Heart size={19} fill="currentColor"/></button><input aria-label="Write a comment" value={commentDraft} onChange={event => setCommentDraft(event.target.value)} placeholder="Add a comment…" maxLength={240}/><button type="submit" disabled={!commentDraft.trim()} aria-label="Send comment"><Send size={17}/></button></form></>}</aside><footer className="party-room-controls party-room-glass">{party.format !== "watch" && <button type="button" className={muted ? "is-off" : ""} onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicOff size={20}/> : <Mic size={20}/>}<span>{muted ? "Unmute" : "Mute"}</span></button>}{party.format === "video" && <button type="button" className={cameraOff ? "is-off" : ""} onClick={toggleCamera} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? <VideoOff size={20}/> : <Video size={20}/>}<span>{cameraOff ? "Camera on" : "Camera off"}</span></button>}<button type="button" className="party-room-chat-toggle" onClick={() => setChatOpen(value => !value)} aria-label={chatOpen ? "Hide comments" : "Show comments"}><MessageCircle size={20}/><span>Chat</span></button><button type="button" className="party-room-end" onClick={leave}><PhoneOff size={20}/><span>Leave</span></button></footer></>}
     <p className="party-room-footnote">{party.format === "watch" ? "YouTube videos play in the embedded player · Direct video links support synchronized controls" : "Live peer-to-peer media · Camera and microphone access required · Best for small groups"}</p>
   </section>;
 }
