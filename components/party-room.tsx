@@ -132,7 +132,17 @@ export default function PartyRoom({ party, userId, onClose }: { party: PartyRoom
                 send({ kind: "watch-source", from: userId, to: signal.from, url: watchUrlRef.current });
                 if (video) send({ kind: video.paused ? "watch-pause" : "watch-play", from: userId, to: signal.from, time: video.currentTime });
               }
-              if (party.format !== "watch" && userId.localeCompare(signal.from) < 0) await connectPeer(signal.from, true);
+              if (party.format !== "watch") {
+                const ordering = userId.localeCompare(signal.from);
+                if (ordering < 0) {
+                  // The lexicographically smaller user creates the offer for each peer pair.
+                  await connectPeer(signal.from, true);
+                } else if (!signal.to) {
+                  // If the lower-ID user sent the first hello, acknowledge it directly so
+                  // they discover us and create the offer instead of waiting forever.
+                  send({ kind: "hello", from: userId, to: signal.from });
+                }
+              }
             } else if (signal.kind === "offer" && signal.sdp) {
               let pc = peers.current.get(signal.from);
               if (!pc) { await connectPeer(signal.from, false); pc = peers.current.get(signal.from); }
