@@ -318,7 +318,11 @@ export default function HomePage() {
       }
       return true;
     } catch (error) {
-      setNotice(error instanceof Error ? "Couldn’t update your RSVP: " + error.message : "Couldn’t update your RSVP. Please try again.");
+      const message = typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+        ? error.message
+        : error instanceof Error ? error.message : "Please try again.";
+      console.error("Couldn’t update ZeeChat party RSVP", error);
+      setNotice("Couldn’t update your RSVP: " + message);
       return false;
     } finally { setPartyBusyIds(current => current.filter(id => id !== party.id)); }
   }
