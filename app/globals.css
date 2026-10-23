@@ -2325,7 +2325,8 @@ body {
 .voice-waveform-placeholder.is-loading span:nth-child(3n){animation-delay:-.3s}
 .voice-waveform-placeholder.is-loading span:nth-child(4n){animation-delay:-.45s}
 .voice-note-audio-engine{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.chat-message-audio-fallback{display:block;width:100%;height:36px;margin-top:7px}\n.chat-audio-message:has(.chat-message-audio-fallback) .voice-note-main{display:none}
+.chat-message-audio-fallback{display:block;width:100%;height:36px;margin-top:7px}
+.chat-audio-message:has(.chat-message-audio-fallback) .voice-note-main{display:none}
 @keyframes voice-wave-bounce{from{transform:scaleY(.45);opacity:.72}to{transform:scaleY(1);opacity:1}}
 @keyframes chat-voice-pulse{from{opacity:.7}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.chat-voice-button.is-recording,.voice-wave-bar.is-animating,.voice-waveform-placeholder.is-loading span{animation:none}.voice-play-toggle,.voice-wave-bar{transition:none}}
