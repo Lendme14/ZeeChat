@@ -41,18 +41,26 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
           client.from("zeechat_comments").select("id", { count: "exact", head: true }).eq("post_id", post.id).gte("created_at", since),
         ]);
         if (!active) return;
-        if (viewResult.error) throw viewResult.error;
-        setViews(((viewResult.data ?? []) as ViewRow[]).reverse());
-        setTotalViews(viewResult.count ?? (viewResult.data ?? []).length);
+        setLikes(likeResult.count ?? 0);
+        setComments(commentResult.count ?? 0);
+        if (viewResult.error) {
+          setAdvancedAvailable(false);
+          setViews([]);
+          const fallback = await client.rpc("zeechat_post_view_counts", { post_ids: [post.id] });
+          if (fallback.error) throw viewResult.error;
+          const row = (fallback.data as { post_id: string; view_count: number | string }[] | null)?.find(item => item.post_id === post.id);
+          setTotalViews(row ? Number(row.view_count) : 0);
+        } else {
+          setViews(((viewResult.data ?? []) as ViewRow[]).reverse());
+          setTotalViews(viewResult.count ?? (viewResult.data ?? []).length);
+        }
         if (eventResult.error) {
           setAdvancedAvailable(false);
           setEvents([]);
         } else {
-          setAdvancedAvailable(true);
           setEvents((eventResult.data ?? []) as EventRow[]);
+          if (!viewResult.error) setAdvancedAvailable(true);
         }
-        setLikes(likeResult.count ?? 0);
-        setComments(commentResult.count ?? 0);
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : "Analytics could not be loaded right now.");
       } finally {
@@ -129,7 +137,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
           <div className="analytics-metric-grid">{cards.map(card => { const Icon = card.icon; return <article className="analytics-metric-card" key={card.label}><div className="analytics-metric-top"><span>{card.label}</span><Icon size={17}/></div><b>{loading ? "—" : numberFormat(card.value)}</b><small>{card.note}</small></article>; })}</div>
           <article className="analytics-chart-card"><header><div><b>Views over time</b><span>Daily view activity</span></div><strong><Eye size={15}/>{loading ? "—" : numberFormat(metrics.views)}</strong></header>
             <div className="analytics-chart-wrap">
-              {loading ? <div className="analytics-chart-loading"><span/><span/><span/><span/><span/><span/><span/></div> : trend.some(day => day.count > 0) ? <svg viewBox="0 0 300 112" role="img" aria-label={"Views trend for the last " + range + " days"} preserveAspectRatio="none"><defs><linearGradient id="reel-analytics-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#ff6ba6" stopOpacity=".32"/><stop offset="100%" stopColor="#a88bff" stopOpacity="0"/></linearGradient></defs><path d={chart.path + " L294 100 L6 100 Z"} fill="url(#reel-analytics-fill)"/><path d={chart.path} fill="none" stroke="#ff6ba6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>{chart.points.filter((_, index) => index === chart.points.length - 1 || trend[ index ].count > 0 && index % Math.max(1, Math.floor(range / 7)) === 0).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="3" fill="#f9e4f0" stroke="#ff6ba6" strokeWidth="1.5"/>)}</svg> : <div className="analytics-chart-empty"><ChartNoAxesCombined size={24}/><b>No views in this period yet</b><span>Share your Reel to help it find its audience.</span></div>}
+              {loading ? <div className="analytics-chart-loading"><span/><span/><span/><span/><span/><span/><span/></div> : trend.some(day => day.count > 0) ? <svg viewBox="0 0 300 112" role="img" aria-label={"Views trend for the last " + range + " days"} preserveAspectRatio="none"><defs><linearGradient id="reel-analytics-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#ff6ba6" stopOpacity=".32"/><stop offset="100%" stopColor="#a88bff" stopOpacity="0"/></linearGradient></defs><path d={chart.path + " L294 100 L6 100 Z"} fill="url(#reel-analytics-fill)"/><path d={chart.path} fill="none" stroke="#ff6ba6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>{chart.points.filter((_, index) => index === chart.points.length - 1 || trend[ index ].count > 0 && index % Math.max(1, Math.floor(range / 7)) === 0).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="3" fill="#f9e4f0" stroke="#ff6ba6" strokeWidth="1.5"/>)}</svg> : <div className="analytics-chart-empty"><ChartNoAxesCombined size={24}/><b>{metrics.views > 0 ? "Detailed view history unavailable" : "No views in this period yet"}</b><span>{metrics.views > 0 ? "Daily trends appear after the analytics update is enabled." : "Share your Reel to help it find its audience."}</span></div>}
             </div>
             <footer><span>{trend[0]?.label}</span><span>{trend[Math.floor(trend.length / 2)]?.label}</span><span>{trend[trend.length - 1]?.label}</span></footer>
           </article>
