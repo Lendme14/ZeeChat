@@ -36,7 +36,7 @@ create policy "Signed-in viewers can record Reel analytics"
     and exists (
       select 1 from public.zeechat_posts p
       where p.id = post_id
-        and (p.visibility = 'public' or p.author_id = (select auth.uid()))
+        and (p.visibility = 'public' or p.author_id = (select auth.uid()) or (p.visibility = 'followers' and exists (select 1 from public.zeechat_follows f where f.follower_id = (select auth.uid()) and f.followed_id = p.author_id)))
     )
   );
 
@@ -54,3 +54,4 @@ create policy "Creators can read views for their own Reels"
   );
 
 grant select, insert on public.zeechat_reel_analytics_events to authenticated;
+grant select on public.zeechat_post_views to authenticated;
