@@ -70,7 +70,6 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     const shares = events.filter(event => event.event_type === "share").length;
     const saves = events.filter(event => event.event_type === "save").length;
     const avgWatch = watchEvents.length ? totalWatch / watchEvents.length : 0;
-    const avgCompletion = watchEvents.length ? watchEvents.reduce((sum, event) => sum + Math.max(0, Number(event.completion_pct) || 0), 0) / watchEvents.length : 0;
     const completionRate = watchEvents.length ? (completions / watchEvents.length) * 100 : 0;
     const engagement = totalViews ? ((likes + comments + saves) / totalViews) * 100 : 0;
     return { views: totalViews, unique, totalWatch, completions, shares, saves, avgWatch, completionRate, engagement };
