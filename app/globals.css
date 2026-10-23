@@ -2259,3 +2259,18 @@ body {
 .editor-audio-mix-controls label{display:grid;gap:7px;font-size:.86rem;font-weight:600}
 .editor-audio-mix-controls input[type=range]{width:100%;accent-color:#fff;cursor:pointer}
 .editor-audio-preview{display:none}
+
+.sound-title-button{display:block;max-width:100%;padding:0;background:none;border:0;color:inherit;text-align:left;font:inherit;font-weight:750;cursor:pointer}
+.sound-title-button:hover{text-decoration:underline}
+.sound-detail-link{margin-top:8px;font-size:.82rem}
+.sound-detail-hero{display:grid;gap:12px;max-width:680px;padding:24px;margin:24px 0;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:22px;background:rgba(255,255,255,.035)}
+.sound-detail-hero .sound-icon{display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.08);font-size:1.7rem}
+.sound-detail-hero h1{margin:0}
+.sound-detail-hero p{margin:0;color:var(--muted,#aaa)}
+.sound-detail-hero audio{width:100%;max-width:420px}
+.sound-detail-hero .create-button{justify-self:start}
+.sound-detail-posts{display:grid;gap:10px;max-width:680px}
+.sound-detail-posts h2{font-size:1.1rem}
+.sound-detail-post{display:flex;gap:12px;align-items:center;text-align:left;padding:12px;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:14px;background:transparent;color:inherit;cursor:pointer}
+.sound-detail-post span:last-child{display:grid;gap:4px}
+.sound-detail-post small{color:var(--muted,#aaa)}
