@@ -2382,7 +2382,7 @@ body {
 .analytics-chart-loading{height:100%;display:flex;align-items:flex-end;gap:8px;padding:10px 0}
 .analytics-chart-loading span{flex:1;height:var(--h,50%);border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#ff6ba677,#a88bff11);animation:analytics-skeleton 1s ease-in-out infinite alternate}
 .analytics-chart-loading span:nth-child(2n){height:35%;animation-delay:-.4s}.analytics-chart-loading span:nth-child(3n){height:78%;animation-delay:-.7s}
-.analytics-watch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.analytics-watch-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .analytics-watch-grid>article{min-width:0;padding:15px;border:1px solid #ffffff10;border-radius:16px;background:#ffffff04}
 .analytics-watch-grid>article>div{display:flex;align-items:center;gap:7px;color:#b9aec5;font-size:10px}
 .analytics-watch-grid>article>div svg{flex:0 0 auto;color:#d99acb}
