@@ -1143,7 +1143,7 @@ export default function HomePage() {
       const { data: targetProfile } = await supabase.from("zeechat_profiles").select("avatar_url").eq("user_id",targetUserId).maybeSingle();
       if (requestId !== chatOpenRequestRef.current) return;
       activeConversationRef.current = id;
-      setActiveConversationId(id); setLiveMessages((messages ?? []) as LiveMessage[]); setReplyToMessage(null); setSelectedCreator({username:targetUsername,initial:targetInitial,avatarUrl:targetProfile?.avatar_url ?? null,userId:targetUserId}); void loadCreatorFollowState(targetUsername); setActiveChat(true); setView("Chats"); setNotice("");
+      setActiveConversationId(id); setLiveMessages(await hydrateChatMessages((messages ?? []) as LiveMessage[])); setReplyToMessage(null); setSelectedCreator({username:targetUsername,initial:targetInitial,avatarUrl:targetProfile?.avatar_url ?? null,userId:targetUserId}); void loadCreatorFollowState(targetUsername); setActiveChat(true); setView("Chats"); setNotice("");
       await loadInbox(userId);
     } catch (error) { if (requestId === chatOpenRequestRef.current) setNotice(error instanceof Error ? error.message : "Could not open this conversation. Please try again."); } finally { if (requestId === chatOpenRequestRef.current) setChatLoading(false); }
   }
