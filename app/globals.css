@@ -2227,3 +2227,26 @@ body {
 .reel-draft-row>div b,.reel-draft-row>div small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .reel-draft-row>div small{color:var(--muted,#999);font-size:.8rem}
 .reel-draft-row button{white-space:nowrap;padding:7px 10px;font-size:.8rem}
+
+
+/* Minimal center playback control for immersive Reels */
+.reels-view.immersive-reels .reel-player>.reel-center-playback{
+  position:absolute!important;left:50%!important;top:50%!important;z-index:7!important;
+  display:grid;place-items:center;width:64px;height:64px;padding:0;
+  transform:translate(-50%,-50%);border:1.5px solid rgba(255,255,255,.9);
+  border-radius:50%;background:rgba(255,255,255,.13);color:#fff;
+  box-shadow:0 4px 24px rgba(0,0,0,.22),inset 0 0 0 1px rgba(255,255,255,.08);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  opacity:1;visibility:visible;pointer-events:auto;
+  transition:opacity .22s ease,visibility .22s ease,background .22s ease,transform .22s ease;
+}
+.reels-view.immersive-reels .reel-player>.reel-center-playback:hover{
+  background:rgba(255,255,255,.24);transform:translate(-50%,-50%) scale(1.04);
+}
+.reels-view.immersive-reels .reel-player>.reel-center-playback.controls-hidden{
+  opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+}
+.reels-view.immersive-reels .reel-player>.reel-center-playback svg{filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))}
+@media(max-width:520px){
+  .reels-view.immersive-reels .reel-player>.reel-center-playback{width:58px;height:58px}
+}
