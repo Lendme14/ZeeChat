@@ -2425,3 +2425,27 @@ body {
 .analytics-export-button:disabled{opacity:.45;cursor:wait}
 .analytics-export-button:focus-visible{outline:2px solid #ff9dc8;outline-offset:3px}
 @media(max-width:700px){.analytics-export-button{margin-left:auto;min-width:38px;padding:0 10px}.analytics-export-button span{display:none}}
+
+/* Audience retention insights in Creator Studio */
+.analytics-retention-card{padding:17px 18px 18px;margin-bottom:13px;border:1px solid #ffffff12;border-radius:19px;background:linear-gradient(135deg,#1a1723,#100e16)}
+.analytics-retention-card>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}
+.analytics-retention-card>header>div{display:grid;gap:5px}
+.analytics-retention-card>header>div>b{font-size:13px}
+.analytics-retention-card>header>div>span{color:#a89db4;font-size:10px}
+.analytics-retention-card>header>strong{display:flex;align-items:center;gap:6px;color:#ffc0dc;font-size:12px;font-variant-numeric:tabular-nums}
+.analytics-retention-bars{display:grid;gap:14px}
+.analytics-retention-row>div:first-child{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:7px;color:#c9bfd3;font-size:10px}
+.analytics-retention-row>div:first-child>b{color:#f2d4e8;font-size:11px;font-variant-numeric:tabular-nums}
+.analytics-retention-track{height:7px;overflow:hidden;border-radius:99px;background:#ffffff0d}
+.analytics-retention-track>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#ff6ba6,#a88bff);box-shadow:0 0 12px #c46bc444;transition:width .45s ease}
+.analytics-retention-row>small{display:block;margin-top:5px;color:#8f849a;font-size:9px}
+.analytics-retention-empty{min-height:104px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;text-align:center;color:#9c90aa}
+.analytics-retention-empty svg{color:#c08fe0}
+.analytics-retention-empty b{color:#e7ddeb;font-size:11px}
+.analytics-retention-empty span{font-size:10px}
+.analytics-retention-loading{display:grid;gap:14px}
+.analytics-retention-loading span{height:7px;border-radius:99px;background:linear-gradient(90deg,#ffffff0a,#ff6ba633,#ffffff0a);background-size:200% 100%;animation:analytics-retention-shimmer 1.1s linear infinite}
+.analytics-retention-loading span:nth-child(2){width:85%}.analytics-retention-loading span:nth-child(3){width:68%}.analytics-retention-loading span:nth-child(4){width:45%}
+@keyframes analytics-retention-shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
+@media(max-width:700px){.analytics-retention-card{padding:15px 13px}.analytics-retention-card>header{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.analytics-retention-track>span,.analytics-retention-loading span{animation:none;transition:none}}

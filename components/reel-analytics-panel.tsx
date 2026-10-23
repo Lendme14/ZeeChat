@@ -24,6 +24,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
   const [comments, setComments] = useState(0);
   const [loading, setLoading] = useState(true);
   const [advancedAvailable, setAdvancedAvailable] = useState(true);
+  const [viewHistoryAvailable, setViewHistoryAvailable] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -53,12 +54,14 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
         setComments(commentResult.count ?? 0);
         if (viewResult.error) {
           setAdvancedAvailable(false);
+          setViewHistoryAvailable(false);
           setViews([]);
           const fallback = await client.rpc("zeechat_post_view_counts", { post_ids: [post.id] });
           if (fallback.error) throw viewResult.error;
           const row = (fallback.data as { post_id: string; view_count: number | string }[] | null)?.find(item => item.post_id === post.id);
           setTotalViews(row ? Number(row.view_count) : 0);
         } else {
+          setViewHistoryAvailable(true);
           setViews(((viewResult.data ?? []) as ViewRow[]).reverse());
           setTotalViews(viewResult.count ?? (viewResult.data ?? []).length);
         }
@@ -90,6 +93,21 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     const engagement = totalViews ? ((likes + comments + saves + shares) / totalViews) * 100 : 0;
     return { views: totalViews, unique, totalWatch, completions, shares, saves, avgWatch, completionRate, engagement };
   }, [views, totalViews, events, likes, comments]);
+
+  const retention = useMemo(() => {
+    const sessions = events.filter(event => event.event_type === "watch_session");
+    const milestones = [
+      { label: "25% watched", threshold: 25 },
+      { label: "50% watched", threshold: 50 },
+      { label: "75% watched", threshold: 75 },
+      { label: "95% watched", threshold: 95 },
+    ];
+    return milestones.map(milestone => ({
+      ...milestone,
+      count: sessions.filter(event => Math.max(0, Number(event.completion_pct) || 0) >= milestone.threshold).length,
+      rate: sessions.length ? (sessions.filter(event => Math.max(0, Number(event.completion_pct) || 0) >= milestone.threshold).length / sessions.length) * 100 : 0,
+    }));
+  }, [events]);
 
   const trend = useMemo(() => {
     const days: { key: string; label: string; count: number }[] = [];
@@ -126,7 +144,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
       ["Post ID", post.id],
       ["Period (days)", range],
       ["Metric", "Value"],
-      ["Total views", metrics.views],
+      [viewHistoryAvailable ? "Views in selected period" : "Lifetime views (date filter unavailable)", metrics.views],
       ["Unique signed-in viewers", metrics.unique],
       ["Likes", likes],
       ["Comments", comments],
@@ -154,8 +172,8 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
   };
 
   const cards = [
-    { label: "Total views", value: metrics.views, icon: Eye, note: "Plays recorded in this period" },
-    { label: "Unique viewers", value: metrics.unique, icon: Users, note: "Signed-in accounts reached" },
+    { label: viewHistoryAvailable ? "Total views" : "Lifetime views", value: metrics.views, icon: Eye, note: viewHistoryAvailable ? "Plays recorded in this period" : "Lifetime count; date filtering unavailable" },
+    { label: "Unique viewers", value: metrics.unique, icon: Users, note: viewHistoryAvailable ? "Signed-in accounts in view history" : "Detailed view history unavailable" },
     { label: "Likes", value: likes, icon: Heart, note: "Likes in selected period" },
     { label: "Comments", value: comments, icon: MessageCircle, note: "Comments in selected period" },
     { label: "Shares", value: metrics.shares, icon: Share2, note: "Shares tracked from ZeeChat" },
@@ -178,14 +196,17 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
           </article>
           <div className="analytics-range-row"><div><b>Performance overview</b><span>Choose a time range for views and watch activity</span></div><div className="analytics-range-switch" aria-label="Analytics time range">{([7, 30, 90] as const).map(value => <button type="button" key={value} className={range === value ? "is-active" : ""} aria-pressed={range === value} onClick={() => setRange(value)}>{value}d</button>)}</div></div>
           {error && <div className="analytics-error" role="alert">{error}</div>}
-          <div className="analytics-metric-grid">{cards.map(card => { const Icon = card.icon; return <article className="analytics-metric-card" key={card.label}><div className="analytics-metric-top"><span>{card.label}</span><Icon size={17}/></div><b>{loading ? "—" : numberFormat(card.value)}</b><small>{card.note}</small></article>; })}</div>
-          <article className="analytics-chart-card"><header><div><b>Views over time</b><span>Daily view activity</span></div><strong><Eye size={15}/>{loading ? "—" : numberFormat(metrics.views)}</strong></header>
+          <div className="analytics-metric-grid">{cards.map(card => { const Icon = card.icon; return <article className="analytics-metric-card" key={card.label}><div className="analytics-metric-top"><span>{card.label}</span><Icon size={17}/></div><b>{loading || (card.label === "Unique viewers" && !viewHistoryAvailable) ? "—" : numberFormat(card.value)}</b><small>{card.note}</small></article>; })}</div>
+          <article className="analytics-chart-card"><header><div><b>{viewHistoryAvailable ? "Views over time" : "View history"}</b><span>{viewHistoryAvailable ? "Daily view activity" : "Daily trend unavailable for this account"}</span></div><strong><Eye size={15}/>{loading ? "—" : numberFormat(metrics.views)}</strong></header>
             <div className="analytics-chart-wrap">
               {loading ? <div className="analytics-chart-loading"><span/><span/><span/><span/><span/><span/><span/></div> : trend.some(day => day.count > 0) ? <svg viewBox="0 0 300 112" role="img" aria-label={"Views trend for the last " + range + " days"} preserveAspectRatio="none"><defs><linearGradient id="reel-analytics-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#ff6ba6" stopOpacity=".32"/><stop offset="100%" stopColor="#a88bff" stopOpacity="0"/></linearGradient></defs><path d={chart.path + " L294 100 L6 100 Z"} fill="url(#reel-analytics-fill)"/><path d={chart.path} fill="none" stroke="#ff6ba6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>{chart.points.filter((_, index) => index === chart.points.length - 1 || trend[ index ].count > 0 && index % Math.max(1, Math.floor(range / 7)) === 0).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="3" fill="#f9e4f0" stroke="#ff6ba6" strokeWidth="1.5"/>)}</svg> : <div className="analytics-chart-empty"><ChartNoAxesCombined size={24}/><b>{metrics.views > 0 ? "Detailed view history unavailable" : "No views in this period yet"}</b><span>{metrics.views > 0 ? "Daily trends appear after the analytics update is enabled." : "Share your Reel to help it find its audience."}</span></div>}
             </div>
             <footer><span>{trend[0]?.label}</span><span>{trend[Math.floor(trend.length / 2)]?.label}</span><span>{trend[trend.length - 1]?.label}</span></footer>
           </article>
-          <div className="analytics-watch-grid"><article><div><Clock3 size={17}/><span>Total watch time</span></div><b>{advancedAvailable && !loading ? formatDuration(metrics.totalWatch) : "—"}</b><small>Combined tracked watch sessions</small></article><article><div><Clock3 size={17}/><span>Average watch time</span></div><b>{advancedAvailable && !loading ? Math.floor(metrics.avgWatch / 60) + ":" + String(Math.floor(metrics.avgWatch % 60)).padStart(2, "0") : "—"}</b><small>Average per tracked play session</small></article><article><div><Sparkles size={17}/><span>Completion rate</span></div><b>{advancedAvailable && !loading ? metrics.completionRate.toFixed(1) + "%" : "—"}</b><small>{numberFormat(metrics.completions)} completed plays in this period</small></article><article><div><ArrowDownLeft size={17}/><span>Engagement rate</span></div><b>{loading ? "—" : metrics.engagement.toFixed(1) + "%"}</b><small>Likes, comments, shares and tracked saves ÷ views</small></article></div>
+          <article className="analytics-retention-card"><header><div><b>Audience retention</b><span>Tracked plays that reached each playback milestone</span></div><strong><Users size={15}/>{loading || !advancedAvailable ? "—" : numberFormat(events.filter(event => event.event_type === "watch_session").length)}</strong></header>
+            {loading ? <div className="analytics-retention-loading"><span/><span/><span/><span/></div> : !advancedAvailable ? <div className="analytics-retention-empty"><Sparkles size={20}/><b>Retention insights are not available yet</b><span>They will appear as playback analytics become available.</span></div> : events.filter(event => event.event_type === "watch_session").length === 0 ? <div className="analytics-retention-empty"><Sparkles size={20}/><b>No tracked plays in this period</b><span>Retention will appear as viewers watch your Reel.</span></div> : <div className="analytics-retention-bars">{retention.map(item => <div className="analytics-retention-row" key={item.threshold}><div><span>{item.label}</span><b>{item.rate.toFixed(0)}%</b></div><div className="analytics-retention-track"><span style={{ width: item.rate + "%" }}/></div><small>{numberFormat(item.count)} of {numberFormat(events.filter(event => event.event_type === "watch_session").length)} tracked plays</small></div>)}</div>}
+          </article>
+          <div className="analytics-watch-grid"><article><div><Clock3 size={17}/><span>Total watch time</span></div><b>{advancedAvailable && !loading ? formatDuration(metrics.totalWatch) : "—"}</b><small>Combined tracked watch sessions</small></article><article><div><Clock3 size={17}/><span>Average watch time</span></div><b>{advancedAvailable && !loading ? Math.floor(metrics.avgWatch / 60) + ":" + String(Math.floor(metrics.avgWatch % 60)).padStart(2, "0") : "—"}</b><small>Average per tracked play session</small></article><article><div><Sparkles size={17}/><span>Completion rate</span></div><b>{advancedAvailable && !loading ? metrics.completionRate.toFixed(1) + "%" : "—"}</b><small>{numberFormat(metrics.completions)} completed plays in this period</small></article><article><div><ArrowDownLeft size={17}/><span>Engagement rate</span></div><b>{loading || !viewHistoryAvailable ? "—" : metrics.engagement.toFixed(1) + "%"}</b><small>{viewHistoryAvailable ? "Likes, comments, shares and tracked saves ÷ views" : "Available when date-filtered view history is enabled"}</small></article></div>
           {!advancedAvailable && <p className="analytics-data-note">Detailed watch time, completion, share and save insights will appear after the Reel analytics update is enabled.</p>}
           <p className="analytics-privacy-note">Analytics are visible only to you as the Reel owner. Views may include repeat plays; unique viewers count signed-in accounts.</p>
         </div>
