@@ -826,10 +826,13 @@ export default function HomePage() {
         if (!active) return;
         const incoming = payload.new as LiveMessage;
         if (!incoming?.id || incoming.conversation_id !== activeConversationId) return;
-        setLiveMessages(current => current.some(message => message.id === incoming.id)
-          ? current
-          : [...current.filter(message => !(message.id.startsWith("optimistic-") && message.sender_id === incoming.sender_id && message.body === incoming.body)), incoming]
-            .sort((a, b) => a.created_at.localeCompare(b.created_at)));
+        void hydrateChatMessages([incoming]).then(([hydrated]) => {
+          if (!active) return;
+          setLiveMessages(current => current.some(message => message.id === hydrated.id)
+            ? current
+            : [...current.filter(message => !(message.id.startsWith("optimistic-") && message.sender_id === hydrated.sender_id && message.body === hydrated.body)), hydrated]
+              .sort((a, b) => a.created_at.localeCompare(b.created_at)));
+        });
         void loadInbox(userId);
       })
       .on("postgres_changes", {
