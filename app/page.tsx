@@ -1118,6 +1118,9 @@ export default function HomePage() {
       setVoiceRecording(true);
       setNotice("Recording voice note… tap the microphone again to finish.");
     } catch (error) {
+      voiceStreamRef.current?.getTracks().forEach(track => track.stop());
+      voiceStreamRef.current = null;
+      voiceRecorderRef.current = null;
       setVoiceRecording(false);
       setNotice(error instanceof Error && error.name === "NotAllowedError" ? "Allow microphone access to record a voice note." : "Could not start recording. Check your microphone and try again.");
     }
