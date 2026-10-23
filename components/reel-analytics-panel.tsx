@@ -13,6 +13,7 @@ type EventRow = { event_type: string; watch_seconds: number | null; completion_p
 
 const numberFormat = (value: number) => new Intl.NumberFormat(undefined, { notation: value >= 10000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value);
 const dateLabel = (value: Date, compact = false) => value.toLocaleDateString([], compact ? { month: "numeric", day: "numeric" } : { month: "short", day: "numeric" });
+const formatDuration = (value: number) => { const total = Math.max(0, Math.floor(value)); if (total < 60) return total + "s"; if (total < 3600) return Math.floor(total / 60) + "m " + (total % 60) + "s"; return Math.floor(total / 3600) + "h " + Math.floor((total % 3600) / 60) + "m"; };
 
 export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanelProps) {
   const [range, setRange] = useState<7 | 30 | 90>(30);
@@ -34,14 +35,14 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     void (async () => {
       try {
         const [viewResult, eventResult, likeResult, commentResult] = await Promise.all([
-          client.from("zeechat_post_views").select("viewed_at,viewer_id", { count: "exact" }).eq("post_id", post.id).gte("viewed_at", since).order("viewed_at", { ascending: true }).limit(10000),
+          client.from("zeechat_post_views").select("viewed_at,viewer_id", { count: "exact" }).eq("post_id", post.id).gte("viewed_at", since).order("viewed_at", { ascending: false }).limit(10000),
           client.from("zeechat_reel_analytics_events").select("event_type,watch_seconds,completion_pct,created_at").eq("post_id", post.id).gte("created_at", since).limit(10000),
           client.from("zeechat_post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", post.id).gte("created_at", since),
           client.from("zeechat_comments").select("id", { count: "exact", head: true }).eq("post_id", post.id).gte("created_at", since),
         ]);
         if (!active) return;
         if (viewResult.error) throw viewResult.error;
-        setViews((viewResult.data ?? []) as ViewRow[]);
+        setViews(((viewResult.data ?? []) as ViewRow[]).reverse());
         setTotalViews(viewResult.count ?? (viewResult.data ?? []).length);
         if (eventResult.error) {
           setAdvancedAvailable(false);
@@ -133,7 +134,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
             </div>
             <footer><span>{trend[0]?.label}</span><span>{trend[Math.floor(trend.length / 2)]?.label}</span><span>{trend[trend.length - 1]?.label}</span></footer>
           </article>
-          <div className="analytics-watch-grid"><article><div><Clock3 size={17}/><span>Average watch time</span></div><b>{advancedAvailable && !loading ? Math.floor(metrics.avgWatch / 60) + ":" + String(Math.floor(metrics.avgWatch % 60)).padStart(2, "0") : "—"}</b><small>Average per tracked play session</small></article><article><div><Sparkles size={17}/><span>Completion rate</span></div><b>{advancedAvailable && !loading ? metrics.completionRate.toFixed(1) + "%" : "—"}</b><small>{numberFormat(metrics.completions)} completed plays in this period</small></article><article><div><ArrowDownLeft size={17}/><span>Engagement rate</span></div><b>{loading ? "—" : metrics.engagement.toFixed(1) + "%"}</b><small>Likes, comments and tracked saves ÷ views</small></article></div>
+          <div className="analytics-watch-grid"><article><div><Clock3 size={17}/><span>Total watch time</span></div><b>{advancedAvailable && !loading ? formatDuration(metrics.totalWatch) : "—"}</b><small>Combined tracked watch sessions</small></article><article><div><Clock3 size={17}/><span>Average watch time</span></div><b>{advancedAvailable && !loading ? Math.floor(metrics.avgWatch / 60) + ":" + String(Math.floor(metrics.avgWatch % 60)).padStart(2, "0") : "—"}</b><small>Average per tracked play session</small></article><article><div><Sparkles size={17}/><span>Completion rate</span></div><b>{advancedAvailable && !loading ? metrics.completionRate.toFixed(1) + "%" : "—"}</b><small>{numberFormat(metrics.completions)} completed plays in this period</small></article><article><div><ArrowDownLeft size={17}/><span>Engagement rate</span></div><b>{loading ? "—" : metrics.engagement.toFixed(1) + "%"}</b><small>Likes, comments and tracked saves ÷ views</small></article></div>
           {!advancedAvailable && <p className="analytics-data-note">Detailed watch time, completion, share and save insights will appear after the Reel analytics update is enabled.</p>}
           <p className="analytics-privacy-note">Analytics are visible only to you as the Reel owner. Views may include repeat plays; unique viewers count signed-in accounts.</p>
         </div>
