@@ -37,6 +37,8 @@ alter table public.zeechat_posts
     (atmosphere_location_enabled = false and atmosphere_latitude is null and atmosphere_longitude is null)
     or
     (atmosphere_location_enabled = true
+      and atmosphere_latitude is not null
+      and atmosphere_longitude is not null
       and atmosphere_latitude between -90 and 90
       and atmosphere_longitude between -180 and 180)
   );
