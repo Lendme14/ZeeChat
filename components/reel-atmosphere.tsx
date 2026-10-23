@@ -12,11 +12,14 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   enabled?: boolean;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
+  const [atmosphereEnabled, setAtmosphereEnabled] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
   useEffect(() => {
     try {
+      const enabledSaved = localStorage.getItem("zeechat-atmosphere-enabled");
+      if (enabledSaved === "false") setAtmosphereEnabled(false);
       const saved = localStorage.getItem("zeechat-atmosphere-mode") as Mode | null;
       if (saved === "creator" || saved === "viewer") setMode(saved);
       else setShowPicker(true);
@@ -26,7 +29,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   }, []);
 
   useEffect(() => {
-    if (!enabled || !mode) return;
+    if (!enabled || !atmosphereEnabled || !mode) return;
     let cancelled = false;
     const load = async (latitude: number, longitude: number) => {
       try {
@@ -58,7 +61,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
       );
     }
     return () => { cancelled = true; };
-  }, [enabled, mode, creatorLatitude, creatorLongitude]);
+  }, [enabled, atmosphereEnabled, mode, creatorLatitude, creatorLongitude]);
 
   if (!enabled || !mode || !weather) {
     if (!showPicker) return null;
@@ -75,12 +78,13 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   };
 
   return <>
-    {weather && <div className={"zee-atmosphere zee-atmosphere-" + effect} aria-hidden="true">
+    {atmosphereEnabled && weather && <div className={"zee-atmosphere zee-atmosphere-" + effect} aria-hidden="true">
       {rain && Array.from({ length: 22 }, (_, i) => <i key={i} style={{ left: ((i * 37) % 100) + "%", animationDelay: ((i * 0.23) % 3) + "s", animationDuration: (1.5 + (i % 5) * 0.28) + "s" }} />)}
       {night && <span className="zee-atmosphere-moon">☾</span>}
       {!rain && !night && <span className="zee-atmosphere-sun">☼</span>}
       <button type="button" className="zee-atmosphere-switch" aria-label="Change atmosphere mode" title="Change atmosphere mode" onClick={() => setShowPicker(true)}><CloudRain size={15}/><span>{mode === "creator" ? "Creator" : "My weather"}</span></button>
     </div>}
+    {!showPicker && mode && <button type="button" className="zee-atmosphere-toggle" aria-pressed={atmosphereEnabled} onClick={() => { const next = !atmosphereEnabled; setAtmosphereEnabled(next); try { localStorage.setItem("zeechat-atmosphere-enabled", String(next)); } catch {} if (next && !weather) setShowPicker(true); }} title={atmosphereEnabled ? "Turn Atmosphere off" : "Turn Atmosphere on"}>{atmosphereEnabled ? "Atmosphere on" : "Atmosphere off"}</button>}
     {showPicker && <div className="zee-atmosphere-backdrop" role="presentation">
       <section className="zee-atmosphere-modal" role="dialog" aria-modal="true" aria-labelledby="zee-atmosphere-title">
         <button className="zee-atmosphere-close" type="button" onClick={() => setShowPicker(false)} aria-label="Close"><X size={18}/></button>
@@ -95,7 +99,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
     </div>}
     <style jsx global>{`
       .zee-atmosphere{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;border-radius:inherit}
-      .zee-atmosphere-rain{background:linear-gradient(180deg,rgba(93,157,211,.05),transparent 35%,rgba(18,54,82,.08)}
+      .zee-atmosphere-rain{background:linear-gradient(180deg,rgba(93,157,211,.05),transparent 35%,rgba(18,54,82,.08))}
       .zee-atmosphere-rain i{position:absolute;top:-14%;width:2px;height:38px;border-radius:99px;background:linear-gradient(transparent,rgba(218,240,255,.55));animation:zee-rain-fall linear infinite;filter:drop-shadow(0 0 2px #8fc9ef55)}
       @keyframes zee-rain-fall{to{transform:translate3d(-18px,125vh,0)}}
       .zee-atmosphere-night{background:linear-gradient(180deg,rgba(20,32,85,.16),transparent 45%,rgba(17,30,73,.12))}
@@ -104,7 +108,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
       .zee-atmosphere-sun:after{content:"";position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 42%,rgba(255,236,183,.07) 50%,transparent 58%);animation:zee-sun-drift 12s ease-in-out infinite alternate}
       @keyframes zee-sun-drift{to{transform:translateX(12%) rotate(4deg)}}
       .zee-atmosphere-moon{position:absolute;top:13%;right:10%;font-size:44px;color:#e1eaff;opacity:.55;text-shadow:0 0 25px #c6d9ff}
-      .zee-atmosphere-switch{pointer-events:auto;position:absolute;top:64px;right:12px;display:flex;align-items:center;gap:5px;border:1px solid #ffffff45;border-radius:99px;background:#07111b80;color:#fff;padding:7px 10px;font-size:11px;backdrop-filter:blur(12px)}
+      .zee-atmosphere-toggle{position:absolute;z-index:4;right:12px;top:64px;pointer-events:auto;border:1px solid #ffffff45;border-radius:99px;background:#07111b80;color:#fff;padding:7px 10px;font-size:11px;backdrop-filter:blur(12px)}\n      .zee-atmosphere-switch{pointer-events:auto;position:absolute;top:64px;right:12px;display:flex;align-items:center;gap:5px;border:1px solid #ffffff45;border-radius:99px;background:#07111b80;color:#fff;padding:7px 10px;font-size:11px;backdrop-filter:blur(12px)}
       .zee-atmosphere-backdrop{position:absolute;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:#030712a8;backdrop-filter:blur(9px);pointer-events:auto}
       .zee-atmosphere-modal{position:relative;width:min(100%,360px);padding:25px 20px 20px;border:1px solid #ffffff20;border-radius:26px;background:linear-gradient(145deg,#172334,#0b111b 80%);color:#f8fafc;box-shadow:0 24px 80px #0008}
       .zee-atmosphere-close{position:absolute;right:14px;top:14px;display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:#ffffff12;color:#dbeafe}
