@@ -46,7 +46,7 @@ type PostComment = { id: string; post_id: string; author_id: string; body: strin
 type ProfileSummary = { username: string; display_name: string; bio: string | null; avatar_url?: string | null; cover_url?: string | null; is_private?: boolean | null; };
 type IncomingFollowRequest = { id: string; requester_id: string; created_at: string; username: string; display_name: string };
 type ReelDraft = { id: string; user_id: string; caption: string; media_path: string; media_type: string; media_name: string; filter_name: string; zoom: number; crop_ratio: string; created_at: string; updated_at: string };
-type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null; reply_to_id?: string | null };
+type LiveMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at?: string | null; reply_to_id?: string | null; attachment_path?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_url?: string | null };
 type ZeeNotification = { id: string; recipient_id: string; actor_id: string | null; kind: "message" | "follow" | "comment" | "like" | "caption_vote"; title: string; body: string; entity_id: string | null; source_id: string | null; created_at: string; read_at: string | null };
 type ZeeNotificationPreferences = { messages: boolean; follows: boolean; comments: boolean; likes: boolean; community: boolean };
 const DEFAULT_NOTIFICATION_PREFERENCES: ZeeNotificationPreferences = { messages: true, follows: true, comments: true, likes: true, community: true };
@@ -244,6 +244,8 @@ export default function HomePage() {
   const [creatorProfileLoading, setCreatorProfileLoading] = useState(false);
   const [selectedCreatorFollowCounts, setSelectedCreatorFollowCounts] = useState({ followers: 0, following: 0 });
   const [chatDraft, setChatDraft] = useState("");
+  const chatAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const [chatAttachmentBusy, setChatAttachmentBusy] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<LiveMessage | null>(null);
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
   const [chatReportOpen, setChatReportOpen] = useState(false);
@@ -1015,7 +1017,7 @@ export default function HomePage() {
       const { data: profiles, error: profileError } = await supabase.from("zeechat_profiles").select("user_id,username,display_name,avatar_url").in("user_id", otherIds);
       if (profileError) throw profileError;
       if (!isLatestRequest()) return;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id").in("conversation_id", conversationIds).order("created_at", { ascending: false });
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id,attachment_path,attachment_type,attachment_name").in("conversation_id", conversationIds).order("created_at", { ascending: false });
       if (messageError) throw messageError;
       if (!isLatestRequest()) return;
       const latest: Record<string, LiveMessage> = {};
@@ -1033,6 +1035,37 @@ export default function HomePage() {
     }
   }
 
+  async function hydrateChatMessages(rows: LiveMessage[]): Promise<LiveMessage[]> {
+    const supabase = createClient();
+    return Promise.all(rows.map(async message => {
+      if (!message.attachment_path) return message;
+      const { data, error } = await supabase.storage.from("zeechat-chat-media").createSignedUrl(message.attachment_path, 3600);
+      return { ...message, attachment_url: error ? null : data?.signedUrl ?? null };
+    }));
+  }
+
+  async function sendChatAttachment(file: File) {
+    if (!userId || !activeConversationId) { setNotice("Open a conversation before attaching media."); return; }
+    const allowed = ["image/jpeg","image/png","image/webp","image/gif","video/mp4","video/webm","video/quicktime"];
+    if (!allowed.includes(file.type)) { setNotice("Choose a JPG, PNG, WebP, GIF, MP4, WebM, or MOV file."); return; }
+    if (file.size > 50 * 1024 * 1024) { setNotice("Chat attachments must be 50 MB or smaller."); return; }
+    const conversationId = activeConversationId;
+    setChatAttachmentBusy(true); setNotice("");
+    try {
+      const supabase = createClient();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100) || "attachment";
+      const path = userId + "/" + conversationId + "/" + crypto.randomUUID() + "-" + safeName;
+      const { error: uploadError } = await supabase.storage.from("zeechat-chat-media").upload(path, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data, error } = await supabase.from("zeechat_messages").insert({ conversation_id: conversationId, sender_id: userId, body: file.type.startsWith("video/") ? "Video" : "Photo", attachment_path: path, attachment_type: file.type, attachment_name: file.name.slice(0, 255) }).select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id,attachment_path,attachment_type,attachment_name").single();
+      if (error) { await supabase.storage.from("zeechat-chat-media").remove([path]); throw error; }
+      const hydrated = (await hydrateChatMessages([data as LiveMessage]))[0];
+      if (activeConversationRef.current === conversationId) setLiveMessages(current => [...current.filter(message => message.id !== hydrated.id), hydrated].sort((a,b) => a.created_at.localeCompare(b.created_at)));
+      await loadInbox(userId);
+    } catch (error) { setNotice(error instanceof Error ? "Attachment not sent: " + error.message : "Attachment not sent. Please try again."); }
+    finally { setChatAttachmentBusy(false); if (chatAttachmentInputRef.current) chatAttachmentInputRef.current.value = ""; }
+  }
+
   async function openExistingConversation(item: InboxConversation) {
     if (!userId) { setNotice("Sign in to view your messages."); return; }
     const requestId = ++chatOpenRequestRef.current;
@@ -1041,7 +1074,7 @@ export default function HomePage() {
     try {
       const supabase = createClient();
       const { data: messages, error } = await supabase.from("zeechat_messages")
-        .select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id")
+        .select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id,attachment_path,attachment_type,attachment_name")
         .eq("conversation_id", item.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -1055,7 +1088,7 @@ export default function HomePage() {
       setSelectedCreator({ username: item.username, initial: (item.displayName[0] || "Z").toUpperCase(), avatarUrl: item.avatarUrl, userId: item.otherUserId });
       activeConversationRef.current = item.id;
       setActiveConversationId(item.id);
-      setLiveMessages((messages ?? []) as LiveMessage[]);
+      setLiveMessages(await hydrateChatMessages((messages ?? []) as LiveMessage[]));
       setChatDraft("");
       setReplyToMessage(null);
       setActiveChat(true);
@@ -1102,7 +1135,7 @@ export default function HomePage() {
       const { data: conversationId, error } = await supabase.rpc("zeechat_start_conversation", { target_user: targetUserId });
       if (error) throw error;
       const id=conversationId as string;
-      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id").eq("conversation_id",id).order("created_at",{ascending:true});
+      const { data: messages, error: messageError } = await supabase.from("zeechat_messages").select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id,attachment_path,attachment_type,attachment_name").eq("conversation_id",id).order("created_at",{ascending:true});
       if (messageError) throw messageError;
       const { data: targetProfile } = await supabase.from("zeechat_profiles").select("avatar_url").eq("user_id",targetUserId).maybeSingle();
       if (requestId !== chatOpenRequestRef.current) return;
@@ -1181,7 +1214,7 @@ export default function HomePage() {
       const supabase = createClient();
       const { data, error } = await supabase.from("zeechat_messages")
         .insert({ conversation_id: conversationId, sender_id: userId, body, reply_to_id: replyToId })
-        .select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id").single();
+        .select("id,conversation_id,sender_id,body,created_at,read_at,reply_to_id,attachment_path,attachment_type,attachment_name").single();
       if (error) throw error;
       if (activeConversationRef.current === conversationId) {
         setLiveMessages(current => current.map(message => message.id === optimistic.id ? data as LiveMessage : message));
