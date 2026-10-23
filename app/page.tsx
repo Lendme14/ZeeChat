@@ -1054,12 +1054,12 @@ export default function HomePage() {
     }));
   }
 
-  async function sendChatAttachment(file: File) {
-    if (!userId || !activeConversationId) { setNotice("Open a conversation before attaching media."); return; }
+  async function sendChatAttachment(file: File, targetConversationId?: string) {
+    const conversationId = targetConversationId ?? activeConversationId;
+    if (!userId || !conversationId) { setNotice("Open a conversation before attaching media."); return; }
     const allowed = ["image/jpeg","image/png","image/webp","image/gif","video/mp4","video/webm","video/quicktime","audio/webm","audio/mp4","audio/ogg","audio/mpeg","audio/wav","audio/aac"];
     if (!allowed.includes(file.type)) { setNotice("Choose a supported photo, video, or voice-note file."); return; }
     if (file.size > 50 * 1024 * 1024) { setNotice("Chat attachments must be 50 MB or smaller."); return; }
-    const conversationId = activeConversationId;
     const isAudio = file.type.startsWith("audio/");
     setChatAttachmentBusy(true); setNotice("");
     try {
@@ -1079,7 +1079,8 @@ export default function HomePage() {
   }
 
   async function startVoiceRecording() {
-    if (!userId || !activeConversationId) { setNotice("Open a conversation before recording a voice note."); return; }
+    const recordingConversationId = activeConversationId;
+    if (!userId || !recordingConversationId) { setNotice("Open a conversation before recording a voice note."); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setNotice("Voice recording is not supported by this browser. Try the latest Chrome browser.");
       return;
@@ -1104,7 +1105,7 @@ export default function HomePage() {
         const extension = actualType === "audio/mp4" ? "m4a" : actualType === "audio/ogg" ? "ogg" : actualType === "audio/mpeg" ? "mp3" : actualType === "audio/wav" ? "wav" : "webm";
         const blob = new Blob(chunks, { type: actualType });
         if (!blob.size) { setNotice("No audio was captured. Please record again."); return; }
-        void sendChatAttachment(new File([blob], "voice-note-" + Date.now() + "." + extension, { type: actualType }));
+        void sendChatAttachment(new File([blob], "voice-note-" + Date.now() + "." + extension, { type: actualType }), recordingConversationId);
       };
       voiceRecorderRef.current = recorder;
       recorder.start();
