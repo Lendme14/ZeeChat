@@ -1800,6 +1800,17 @@ export default function HomePage() {
     finally { setReelDraftBusy(false); }
   }
 
+  useEffect(() => {
+    if (!audioFile) { setAudioPreviewUrl(null); return; }
+    const url = URL.createObjectURL(audioFile);
+    setAudioPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [audioFile]);
+
+  useEffect(() => {
+    if (editorAudioRef.current) editorAudioRef.current.volume = musicVolume / 100;
+  }, [musicVolume, audioPreviewUrl, selectedSound]);
+
   async function publish() {
     if (!caption.trim() && !mediaFile) return;
     if (!userId) { setNotice("Sign in first to publish a post."); return; }
@@ -1816,7 +1827,38 @@ export default function HomePage() {
     let storedThumbnailPath: string | null = null;
     let postInserted = false;
     try {
-      const uploadMedia = mediaFile ? await prepareImageForPublish(mediaFile) : null;
+      let mediaForPublish = mediaFile;
+      if (mediaFile?.type.startsWith("video/") && (selectedSound || audioFile)) {
+        const mixerUrl = process.env.NEXT_PUBLIC_MEDIA_MIXER_URL?.replace(/\/$/, "");
+        if (!mixerUrl) throw new Error("Sound mixing is not configured yet. The Reel mixer service must be deployed and NEXT_PUBLIC_MEDIA_MIXER_URL set before publishing Reels with music.");
+        let audioBlob: Blob;
+        if (audioFile) audioBlob = audioFile;
+        else {
+          const audioResponse = await fetch(selectedSound!.audio_url);
+          if (!audioResponse.ok) throw new Error("Could not load the selected sound. Choose another sound and try again.");
+          audioBlob = await audioResponse.blob();
+        }
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.access_token) throw new Error("Please sign in again before mixing audio.");
+        const form = new FormData();
+        form.append("video", mediaFile, mediaFile.name);
+        form.append("audio", audioBlob, audioFile?.name || "reused-sound.mp3");
+        form.append("audioStartSeconds", String(audioStartSeconds));
+        form.append("musicVolume", String(musicVolume / 100));
+        form.append("originalVolume", String(originalVolume / 100));
+        setUploadLabel("Mixing your Reel audio…");
+        setUploadProgress(8);
+        const mixResponse = await fetch(mixerUrl + "/v1/mix", { method: "POST", headers: { Authorization: "Bearer " + session.access_token }, body: form });
+        if (!mixResponse.ok) {
+          const reason = (await mixResponse.text().catch(() => "")).slice(0, 300);
+          throw new Error("Could not mix Reel audio" + (reason ? ": " + reason : ".") + " Please try again.");
+        }
+        const mixedVideo = await mixResponse.blob();
+        if (!mixedVideo.size || mixedVideo.size > 100 * 1024 * 1024) throw new Error("The mixed video is empty or exceeds the 100 MB upload limit.");
+        const filename = mediaFile.name.replace(/\.[^.]+$/, "") + "-with-sound.mp4";
+        mediaForPublish = new File([mixedVideo], filename, { type: "video/mp4", lastModified: Date.now() });
+      }
+      const uploadMedia = mediaForPublish ? await prepareImageForPublish(mediaForPublish) : null;
       let mediaUrl: string | null = null;
       let soundId: string | null = selectedSound?.id ?? null;
       let thumbnailUrl: string | null = null;
