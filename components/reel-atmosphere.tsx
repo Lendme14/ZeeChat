@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CloudRain, Sun, Moon, Sunrise, X } from "lucide-react";
+import { CloudRain, Sun, Sunrise, X } from "lucide-react";
 
 type Mode = "creator" | "viewer";
 type WeatherSnapshot = { code: number; isDay: boolean; precipitation: number; wind: number };
@@ -14,7 +14,6 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   const [mode, setMode] = useState<Mode | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -53,7 +52,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
       void load(creatorLatitude as number, creatorLongitude as number);
     } else if (mode === "viewer" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        position => { if (!cancelled) { const next = { latitude: position.coords.latitude, longitude: position.coords.longitude }; setCoords(next); void load(next.latitude, next.longitude); } },
+        position => { if (!cancelled) { const next = { latitude: position.coords.latitude, longitude: position.coords.longitude }; void load(next.latitude, next.longitude); } },
         () => { if (!cancelled) setWeather(null); },
         { maximumAge: 300000, timeout: 7000, enableHighAccuracy: false },
       );
