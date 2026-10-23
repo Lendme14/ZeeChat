@@ -63,10 +63,6 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
     return () => { cancelled = true; };
   }, [enabled, atmosphereEnabled, mode, creatorLatitude, creatorLongitude]);
 
-  if (!enabled || !mode || !weather) {
-    if (!showPicker) return null;
-  }
-
   const rain = Boolean(weather && (weather.precipitation > 0 || (weather.code >= 51 && weather.code <= 82)));
   const storm = Boolean(weather && weather.code >= 95);
   const cloudy = Boolean(weather && [1, 2, 3, 45, 48].includes(weather.code));
