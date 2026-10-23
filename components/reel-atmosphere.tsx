@@ -1,0 +1,126 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { CloudRain, Sun, Moon, Sunrise, X } from "lucide-react";
+
+type Mode = "creator" | "viewer";
+type WeatherSnapshot = { code: number; isDay: boolean; precipitation: number; wind: number };
+
+export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enabled = true }: {
+  creatorLatitude?: number | null;
+  creatorLongitude?: number | null;
+  enabled?: boolean;
+}) {
+  const [mode, setMode] = useState<Mode | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("zeechat-atmosphere-mode") as Mode | null;
+      if (saved === "creator" || saved === "viewer") setMode(saved);
+      else setShowPicker(true);
+      const disabled = localStorage.getItem("zeechat-atmosphere-enabled");
+      if (disabled === "false") setShowPicker(false);
+    } catch { setShowPicker(true); }
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || !mode) return;
+    let cancelled = false;
+    const load = async (latitude: number, longitude: number) => {
+      try {
+        const url = new URL("https://api.open-meteo.com/v1/forecast");
+        url.search = new URLSearchParams({
+          latitude: String(latitude), longitude: String(longitude),
+          current: "weather_code,is_day,precipitation,wind_speed_10m",
+          timezone: "auto",
+        }).toString();
+        const response = await fetch(url.toString());
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data.current) setWeather({
+          code: Number(data.current.weather_code ?? 0),
+          isDay: Number(data.current.is_day ?? 1) === 1,
+          precipitation: Number(data.current.precipitation ?? 0),
+          wind: Number(data.current.wind_speed_10m ?? 0),
+        });
+      } catch { /* Weather is decorative: never interrupt video playback. */ }
+    };
+
+    if (mode === "creator" && Number.isFinite(creatorLatitude) && Number.isFinite(creatorLongitude)) {
+      void load(creatorLatitude as number, creatorLongitude as number);
+    } else if (mode === "viewer" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        position => { if (!cancelled) { const next = { latitude: position.coords.latitude, longitude: position.coords.longitude }; setCoords(next); void load(next.latitude, next.longitude); } },
+        () => { if (!cancelled) setWeather(null); },
+        { maximumAge: 300000, timeout: 7000, enableHighAccuracy: false },
+      );
+    }
+    return () => { cancelled = true; };
+  }, [enabled, mode, creatorLatitude, creatorLongitude]);
+
+  if (!enabled || !mode || !weather) {
+    if (!showPicker) return null;
+  }
+
+  const rain = Boolean(weather && (weather.precipitation > 0 || (weather.code >= 51 && weather.code <= 82)));
+  const storm = Boolean(weather && weather.code >= 95);
+  const cloudy = Boolean(weather && [1, 2, 3, 45, 48].includes(weather.code));
+  const night = Boolean(weather && !weather.isDay);
+  const effect = rain || storm ? "rain" : night ? "night" : cloudy ? "cloud" : "sun";
+  const choose = (next: Mode) => {
+    setMode(next); setShowPicker(false);
+    try { localStorage.setItem("zeechat-atmosphere-mode", next); localStorage.setItem("zeechat-atmosphere-enabled", "true"); } catch {}
+  };
+
+  return <>
+    {weather && <div className={"zee-atmosphere zee-atmosphere-" + effect} aria-hidden="true">
+      {rain && Array.from({ length: 22 }, (_, i) => <i key={i} style={{ left: ((i * 37) % 100) + "%", animationDelay: ((i * 0.23) % 3) + "s", animationDuration: (1.5 + (i % 5) * 0.28) + "s" }} />)}
+      {night && <span className="zee-atmosphere-moon">☾</span>}
+      {!rain && !night && <span className="zee-atmosphere-sun">☼</span>}
+      <button type="button" className="zee-atmosphere-switch" aria-label="Change atmosphere mode" title="Change atmosphere mode" onClick={() => setShowPicker(true)}><CloudRain size={15}/><span>{mode === "creator" ? "Creator" : "My weather"}</span></button>
+    </div>}
+    {showPicker && <div className="zee-atmosphere-backdrop" role="presentation">
+      <section className="zee-atmosphere-modal" role="dialog" aria-modal="true" aria-labelledby="zee-atmosphere-title">
+        <button className="zee-atmosphere-close" type="button" onClick={() => setShowPicker(false)} aria-label="Close"><X size={18}/></button>
+        <div className="zee-atmosphere-modal-icon"><CloudRain size={25}/></div>
+        <p className="zee-atmosphere-eyebrow">ZEECHAT EXPERIENCE</p>
+        <h2 id="zee-atmosphere-title">Choose your atmosphere</h2>
+        <p>Live conditions shape subtle effects while you watch. Your video stays unchanged.</p>
+        <button className={"zee-atmosphere-option " + (mode === "creator" ? "is-selected" : "")} type="button" onClick={() => choose("creator")}><span className="zee-atmosphere-option-icon"><Sun size={21}/></span><span><b>Creator's weather</b><small>Live conditions at the creator's saved post location</small></span></button>
+        <button className={"zee-atmosphere-option " + (mode === "viewer" ? "is-selected" : "")} type="button" onClick={() => choose("viewer")}><span className="zee-atmosphere-option-icon"><Sunrise size={21}/></span><span><b>My local weather</b><small>Live conditions where you're watching; location permission may be requested</small></span></button>
+        <p className="zee-atmosphere-footnote">Weather data may be approximate or delayed. If unavailable, the Reel plays normally.</p>
+      </section>
+    </div>}
+    <style jsx global>{`
+      .zee-atmosphere{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;border-radius:inherit}
+      .zee-atmosphere-rain{background:linear-gradient(180deg,rgba(93,157,211,.05),transparent 35%,rgba(18,54,82,.08)}
+      .zee-atmosphere-rain i{position:absolute;top:-14%;width:2px;height:38px;border-radius:99px;background:linear-gradient(transparent,rgba(218,240,255,.55));animation:zee-rain-fall linear infinite;filter:drop-shadow(0 0 2px #8fc9ef55)}
+      @keyframes zee-rain-fall{to{transform:translate3d(-18px,125vh,0)}}
+      .zee-atmosphere-night{background:linear-gradient(180deg,rgba(20,32,85,.16),transparent 45%,rgba(17,30,73,.12))}
+      .zee-atmosphere-cloud{background:linear-gradient(135deg,rgba(221,232,242,.05),transparent 55%,rgba(185,202,220,.08))}
+      .zee-atmosphere-sun{background:radial-gradient(ellipse at 90% 8%,rgba(255,224,145,.22),transparent 34%);mix-blend-mode:screen}
+      .zee-atmosphere-sun:after{content:"";position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 42%,rgba(255,236,183,.07) 50%,transparent 58%);animation:zee-sun-drift 12s ease-in-out infinite alternate}
+      @keyframes zee-sun-drift{to{transform:translateX(12%) rotate(4deg)}}
+      .zee-atmosphere-moon{position:absolute;top:13%;right:10%;font-size:44px;color:#e1eaff;opacity:.55;text-shadow:0 0 25px #c6d9ff}
+      .zee-atmosphere-switch{pointer-events:auto;position:absolute;top:64px;right:12px;display:flex;align-items:center;gap:5px;border:1px solid #ffffff45;border-radius:99px;background:#07111b80;color:#fff;padding:7px 10px;font-size:11px;backdrop-filter:blur(12px)}
+      .zee-atmosphere-backdrop{position:absolute;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:#030712a8;backdrop-filter:blur(9px);pointer-events:auto}
+      .zee-atmosphere-modal{position:relative;width:min(100%,360px);padding:25px 20px 20px;border:1px solid #ffffff20;border-radius:26px;background:linear-gradient(145deg,#172334,#0b111b 80%);color:#f8fafc;box-shadow:0 24px 80px #0008}
+      .zee-atmosphere-close{position:absolute;right:14px;top:14px;display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:#ffffff12;color:#dbeafe}
+      .zee-atmosphere-modal-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:#60a5fa20;color:#93c5fd;margin-bottom:15px}
+      .zee-atmosphere-eyebrow{font-size:10px;letter-spacing:.17em;font-weight:800;color:#93c5fd;margin:0 0 8px}
+      .zee-atmosphere-modal h2{font-size:23px;letter-spacing:-.04em;line-height:1.15;margin:0 0 9px}
+      .zee-atmosphere-modal>p:not(.zee-atmosphere-eyebrow){font-size:12px;line-height:1.6;color:#a9b8ca;margin:0 0 16px}
+      .zee-atmosphere-option{width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:13px;margin-top:9px;border:1px solid #ffffff20;border-radius:16px;background:#ffffff06;color:#fff}
+      .zee-atmosphere-option.is-selected{border-color:#60a5fa;background:#60a5fa13}
+      .zee-atmosphere-option-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:13px;background:#ffffff10;color:#bfdbfe}
+      .zee-atmosphere-option b,.zee-atmosphere-option small{display:block}
+      .zee-atmosphere-option b{font-size:13px;margin-bottom:4px}
+      .zee-atmosphere-option small{font-size:10px;line-height:1.5;color:#a9b8ca}
+      .zee-atmosphere-footnote{font-size:10px!important;margin:14px 0 0!important}
+      @media(prefers-reduced-motion:reduce){.zee-atmosphere-rain i,.zee-atmosphere-sun:after{animation:none!important}}
+    `}</style>
+  </>;
+}
