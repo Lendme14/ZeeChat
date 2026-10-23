@@ -133,7 +133,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
       ...trend.map(day => [day.key, day.count]),
     ];
     const csv = rows.map(row => row.map(value => quote(value ?? "")).join(",")).join("\r\n");
-    const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
