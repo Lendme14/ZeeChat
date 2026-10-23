@@ -287,6 +287,18 @@ export default function HomePage() {
       if (partyCreateOpen) { setPartyCreateOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
       if (notificationsOpen) { setNotificationsOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
       if (activeStoryId) { setActiveStoryId(null); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (reelAnalyticsOpen) { setReelAnalyticsOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (reelOptionsOpen) { setReelOptionsOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (notificationSettingsOpen) { setNotificationSettingsOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (editProfileOpen) { setEditProfileOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (openCommentPostIds.length > 0) { setOpenCommentPostIds([]); setReelCommentStickerOpen(false); window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url); return; }
+      if (activeChat) {
+        setActiveChat(false);
+        setActiveConversationId(null);
+        activeConversationRef.current = null;
+        window.history.pushState({zeechatApp:true,zeechatView:currentViewRef.current},"",url);
+        return;
+      }
       const validViews: View[] = ["Home","Reels","Discover","Parties","Chats","Profile"];
       const target = event.state?.zeechatView as View | undefined;
       const nextView = target && validViews.includes(target)
@@ -300,7 +312,7 @@ export default function HomePage() {
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, [createOpen,partyCreateOpen,notificationsOpen,activeStoryId]);
+  }, [createOpen,partyCreateOpen,notificationsOpen,activeStoryId,reelAnalyticsOpen,reelOptionsOpen,notificationSettingsOpen,editProfileOpen,openCommentPostIds,activeChat]);
   useEffect(() => {
     if (viewHistoryRef.current[viewHistoryRef.current.length-1] !== view) viewHistoryRef.current.push(view);
     window.history.pushState({zeechatApp:true,zeechatView:view},"",window.location.pathname+window.location.search);
