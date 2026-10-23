@@ -250,6 +250,7 @@ export default function HomePage() {
   const [chatDraft, setChatDraft] = useState("");
   const chatAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
   const voiceChunksRef = useRef<Blob[]>([]);
   const [voiceRecording, setVoiceRecording] = useState(false);
   const [chatAttachmentBusy, setChatAttachmentBusy] = useState(false);
@@ -1087,6 +1088,7 @@ export default function HomePage() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
       const preferredTypes = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"];
       const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type));
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -1094,11 +1096,15 @@ export default function HomePage() {
       recorder.ondataavailable = event => { if (event.data.size > 0) voiceChunksRef.current.push(event.data); };
       recorder.onerror = () => {
         stream.getTracks().forEach(track => track.stop());
+        if (voiceStreamRef.current === stream) voiceStreamRef.current = null;
+        voiceRecorderRef.current = null;
         setVoiceRecording(false);
         setNotice("Voice recording failed. Please try again.");
       };
       recorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
+        if (voiceStreamRef.current === stream) voiceStreamRef.current = null;
+        if (voiceRecorderRef.current === recorder) voiceRecorderRef.current = null;
         const chunks = voiceChunksRef.current;
         voiceChunksRef.current = [];
         const actualType = (recorder.mimeType || chunks[0]?.type || "audio/webm").split(";")[0].toLowerCase();
@@ -1120,9 +1126,25 @@ export default function HomePage() {
   function stopVoiceRecording() {
     const recorder = voiceRecorderRef.current;
     if (recorder && recorder.state !== "inactive") recorder.stop();
+    else voiceStreamRef.current?.getTracks().forEach(track => track.stop());
     voiceRecorderRef.current = null;
     setVoiceRecording(false);
   }
+
+  useEffect(() => () => {
+    const recorder = voiceRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      // Navigating away should release the microphone without unexpectedly sending a partial recording.
+      recorder.onstop = null;
+      recorder.onerror = null;
+      recorder.ondataavailable = null;
+      try { recorder.stop(); } catch { /* The recorder may already have stopped. */ }
+    }
+    voiceStreamRef.current?.getTracks().forEach(track => track.stop());
+    voiceStreamRef.current = null;
+    voiceRecorderRef.current = null;
+    voiceChunksRef.current = [];
+  }, []);
 
   async function openExistingConversation(item: InboxConversation) {
     if (!userId) { setNotice("Sign in to view your messages."); return; }
