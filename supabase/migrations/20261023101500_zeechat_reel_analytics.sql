@@ -40,4 +40,17 @@ create policy "Signed-in viewers can record Reel analytics"
     )
   );
 
+
+-- Reel owners can inspect the view timeline for their own posts.
+drop policy if exists "Creators can read views for their own Reels" on public.zeechat_post_views;
+create policy "Creators can read views for their own Reels"
+  on public.zeechat_post_views
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.zeechat_posts p
+      where p.id = post_id and p.author_id = (select auth.uid())
+    )
+  );
+
 grant select, insert on public.zeechat_reel_analytics_events to authenticated;
