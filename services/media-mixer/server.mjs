@@ -9,6 +9,8 @@ import os from "node:os";
 import path from "node:path";
 
 const app = express();
+let activeMixes = 0;
+const lastMixByUser = new Map();
 const port = Number(process.env.PORT || 8080);
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -58,12 +60,20 @@ function run(command, args) {
 
 app.post("/v1/mix", upload.fields([{ name: "video", maxCount: 1 }, { name: "audio", maxCount: 1 }]), async (req, res) => {
   let workDir;
+  let ownsMixSlot = false;
   try {
     const bearer = req.headers.authorization || "";
     const token = bearer.startsWith("Bearer ") ? bearer.slice(7) : "";
     if (!token) return res.status(401).send("Sign in is required.");
     const { data: authData, error: authError } = await supabase.auth.getUser(token);
     if (authError || !authData?.user) return res.status(401).send("Your session is invalid or expired.");
+    const userId = authData.user.id;
+    const lastMixAt = lastMixByUser.get(userId) || 0;
+    if (Date.now() - lastMixAt < 8000) return res.status(429).send("Please wait a few seconds before mixing another Reel.");
+    if (activeMixes >= 2) return res.status(503).send("The audio mixer is busy. Please retry shortly.");
+    activeMixes += 1;
+    ownsMixSlot = true;
+    lastMixByUser.set(userId, Date.now());
     const video = req.files?.video?.[0];
     const audio = req.files?.audio?.[0];
     if (!video || !audio) return res.status(400).send("Both video and audio files are required.");
@@ -109,6 +119,7 @@ app.post("/v1/mix", upload.fields([{ name: "video", maxCount: 1 }, { name: "audi
     console.error("Reel mix failed", error instanceof Error ? error.message : "unknown error");
     if (!res.headersSent) res.status(500).send("Audio mixing failed. Please try again.");
   } finally {
+    if (ownsMixSlot) activeMixes = Math.max(0, activeMixes - 1);
     if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => {});
     for (const file of [req.files?.video?.[0], req.files?.audio?.[0]]) {
       if (file?.path) await rm(file.path, { force: true }).catch(() => {});
