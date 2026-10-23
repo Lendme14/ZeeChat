@@ -27,6 +27,14 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
@@ -141,7 +149,8 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    // Allow the browser to start the download before releasing the object URL.
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const cards = [
