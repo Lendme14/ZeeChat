@@ -1812,6 +1812,7 @@ export default function HomePage() {
   }, [musicVolume, audioPreviewUrl, selectedSound]);
 
   async function publish() {
+    if ((selectedSound || audioFile) && (!mediaFile || !mediaFile.type.startsWith("video/"))) { setNotice("Choose a video for your sound Reel. Photos continue to publish to Home without added music."); return; }
     if (!caption.trim() && !mediaFile) return;
     if (!userId) { setNotice("Sign in first to publish a post."); return; }
     const pendingId = crypto.randomUUID();
