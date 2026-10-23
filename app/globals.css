@@ -1663,7 +1663,7 @@ body {
 .party-comment-avatar{flex:0 0 27px;width:27px;height:27px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.15);border-radius:50%;background:linear-gradient(145deg,#6758c9,#263a63);font-size:8px;font-weight:850;color:#fff}
 .party-comment-avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .party-live-comment p{display:flex;flex-direction:column;gap:3px;min-width:0;margin:0;padding:8px 11px;border:1px solid rgba(255,255,255,.07);border-radius:5px 14px 14px 14px;background:rgba(255,255,255,.075);color:#f3f4fa;font-size:12px;line-height:1.4;overflow-wrap:anywhere}
-.party-live-comment p b{color:#b8b1ff;font-size:10px;letter-spacing:.01em}
+.party-live-comment .party-chat-profile-link{align-self:flex-start;padding:0;border:0;background:transparent;color:#b8b1ff;font:inherit;font-size:10px;font-weight:750;letter-spacing:.01em;text-align:left;cursor:pointer}.party-live-comment .party-chat-profile-link:disabled{cursor:default;opacity:1}
 .party-live-comment>svg{margin:9px 0 0;color:#ff7899;flex-shrink:0}
 .party-live-comment.is-own-comment p{background:rgba(116,97,255,.15);border-color:rgba(151,134,255,.2)}
 .party-chat-empty{margin:0;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.06);color:#b8bed0;font-size:12px;line-height:1.5}
