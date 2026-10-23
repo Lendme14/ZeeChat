@@ -134,6 +134,12 @@ export default function HomePage() {
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [selectedDraftPath, setSelectedDraftPath] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioStartSeconds, setAudioStartSeconds] = useState(0);
+  const [musicVolume, setMusicVolume] = useState(70);
+  const [originalVolume, setOriginalVolume] = useState(80);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const editorAudioRef = useRef<HTMLAudioElement | null>(null);
+  const editorVideoRef = useRef<HTMLVideoElement | null>(null);
   const [sounds, setSounds] = useState<ZeeSound[]>([]);
   const [selectedSound, setSelectedSound] = useState<ZeeSound | null>(null);
   const [postKind, setPostKind] = useState<"post" | "reel">("post");
