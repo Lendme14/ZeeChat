@@ -1661,6 +1661,7 @@ body {
 .party-live-comments{display:flex;flex-direction:column;gap:11px;max-height:clamp(90px,19dvh,190px);overflow:auto;overscroll-behavior:contain;padding:4px 2px 10px;scrollbar-width:thin;mask-image:linear-gradient(to bottom,transparent 0,#000 9px)}
 .party-live-comment{display:flex;align-items:flex-start;gap:8px;max-width:min(92%,540px);animation:partyCommentIn .22s ease-out}
 .party-comment-avatar{flex:0 0 27px;width:27px;height:27px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.15);border-radius:50%;background:linear-gradient(145deg,#6758c9,#263a63);font-size:8px;font-weight:850;color:#fff}
+.party-comment-avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .party-live-comment p{display:flex;flex-direction:column;gap:3px;min-width:0;margin:0;padding:8px 11px;border:1px solid rgba(255,255,255,.07);border-radius:5px 14px 14px 14px;background:rgba(255,255,255,.075);color:#f3f4fa;font-size:12px;line-height:1.4;overflow-wrap:anywhere}
 .party-live-comment p b{color:#b8b1ff;font-size:10px;letter-spacing:.01em}
 .party-live-comment>svg{margin:9px 0 0;color:#ff7899;flex-shrink:0}
