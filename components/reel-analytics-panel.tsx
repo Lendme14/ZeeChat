@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowLeft, Bookmark, ChartNoAxesCombined, Clock3, Eye, Heart, MessageCircle, Share2, Sparkles, Users, X } from "lucide-react";
+import { ArrowDownLeft, ArrowLeft, Bookmark, ChartNoAxesCombined, Clock3, Download, Eye, Heart, MessageCircle, Share2, Sparkles, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type ReelAnalyticsPanelProps = {
@@ -110,6 +110,40 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     return { max, path: points.map((point, index) => (index ? "L" : "M") + point.x.toFixed(1) + " " + point.y.toFixed(1)).join(" "), points };
   }, [trend]);
 
+  const exportCsv = () => {
+    const quote = (value: string | number) => '"' + String(value).replace(/"/g, '""') + '"';
+    const rows: (string | number)[][] = [
+      ["ZeeChat Reel analytics"],
+      ["Caption", post.caption || "Untitled Reel"],
+      ["Post ID", post.id],
+      ["Period (days)", range],
+      ["Metric", "Value"],
+      ["Total views", metrics.views],
+      ["Unique signed-in viewers", metrics.unique],
+      ["Likes", likes],
+      ["Comments", comments],
+      ["Tracked shares", metrics.shares],
+      ["Tracked saves", metrics.saves],
+      ["Total watch time (seconds)", Math.round(metrics.totalWatch)],
+      ["Average watch time (seconds)", Math.round(metrics.avgWatch)],
+      ["Completion rate (%)", metrics.completionRate.toFixed(1)],
+      ["Engagement rate (%)", metrics.engagement.toFixed(1)],
+      [],
+      ["Date", "Views"],
+      ...trend.map(day => [day.key, day.count]),
+    ];
+    const csv = rows.map(row => row.map(value => quote(value ?? "")).join(",")).join("\r\n");
+    const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "zeechat-reel-analytics-" + post.id.slice(0, 8) + "-" + range + "d.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const cards = [
     { label: "Total views", value: metrics.views, icon: Eye, note: "Plays recorded in this period" },
     { label: "Unique viewers", value: metrics.unique, icon: Users, note: "Signed-in accounts reached" },
@@ -125,6 +159,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
         <header className="reel-analytics-header">
           <button type="button" className="analytics-back-button" onClick={onClose} aria-label="Close analytics"><ArrowLeft size={19}/></button>
           <div className="analytics-heading-copy"><span><ChartNoAxesCombined size={14}/> CREATOR STUDIO</span><h2 id="reel-analytics-title">Reel analytics</h2><p>Understand your reach, engagement and watch quality.</p></div>
+          <button type="button" className="analytics-export-button" onClick={exportCsv} disabled={loading} aria-label="Export analytics as CSV"><Download size={15}/><span>Export</span></button>
           <button type="button" className="analytics-close-button" onClick={onClose} aria-label="Close analytics"><X size={19}/></button>
         </header>
         <div className="reel-analytics-content">
