@@ -100,8 +100,9 @@ app.post("/v1/mix", upload.fields([{ name: "video", maxCount: 1 }, { name: "audi
     res.setHeader("Content-Disposition", 'attachment; filename="zeechat-reel.mp4"');
     res.setHeader("Cache-Control", "no-store");
     const stream = createReadStream(outputVideo);
+    const completedWorkDir = workDir;
     stream.on("error", error => { console.error("Mixed video stream failed", error.message); if (!res.headersSent) res.status(500).end("Could not return mixed video."); else res.destroy(error); });
-    stream.on("close", () => { if (workDir) void rm(workDir, { recursive: true, force: true }); });
+    stream.on("close", () => { if (completedWorkDir) void rm(completedWorkDir, { recursive: true, force: true }); });
     stream.pipe(res);
     workDir = null; // The stream owns cleanup below.
   } catch (error) {
