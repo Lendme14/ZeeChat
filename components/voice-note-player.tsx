@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Mic, Pause, Play } from "lucide-react";
 
 type VoiceNotePlayerProps = { src: string };
@@ -93,7 +93,7 @@ export default function VoiceNotePlayer({ src }: VoiceNotePlayerProps) {
   }, []);
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
-  const seekFromPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const seekFromPointer = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width > 0) seekTo((event.clientX - rect.left) / rect.width);
   };
