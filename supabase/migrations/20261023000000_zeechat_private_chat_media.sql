@@ -28,6 +28,7 @@ using (
     join public.zeechat_conversation_members cm on cm.conversation_id = m.conversation_id
     where m.attachment_path = storage.objects.name
       and cm.user_id = (select auth.uid())
+      and not private.zeechat_has_block_between_users(m.conversation_id, (select auth.uid()))
   )
 );
 
