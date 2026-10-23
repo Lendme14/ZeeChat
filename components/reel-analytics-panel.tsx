@@ -24,6 +24,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
   const [comments, setComments] = useState(0);
   const [loading, setLoading] = useState(true);
   const [advancedAvailable, setAdvancedAvailable] = useState(true);
+  const [viewHistoryAvailable, setViewHistoryAvailable] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -53,12 +54,14 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
         setComments(commentResult.count ?? 0);
         if (viewResult.error) {
           setAdvancedAvailable(false);
+          setViewHistoryAvailable(false);
           setViews([]);
           const fallback = await client.rpc("zeechat_post_view_counts", { post_ids: [post.id] });
           if (fallback.error) throw viewResult.error;
           const row = (fallback.data as { post_id: string; view_count: number | string }[] | null)?.find(item => item.post_id === post.id);
           setTotalViews(row ? Number(row.view_count) : 0);
         } else {
+          setViewHistoryAvailable(true);
           setViews(((viewResult.data ?? []) as ViewRow[]).reverse());
           setTotalViews(viewResult.count ?? (viewResult.data ?? []).length);
         }
@@ -155,7 +158,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
 
   const cards = [
     { label: "Total views", value: metrics.views, icon: Eye, note: "Plays recorded in this period" },
-    { label: "Unique viewers", value: metrics.unique, icon: Users, note: "Signed-in accounts reached" },
+    { label: "Unique viewers", value: metrics.unique, icon: Users, note: viewHistoryAvailable ? "Signed-in accounts in view history" : "Detailed view history unavailable" },
     { label: "Likes", value: likes, icon: Heart, note: "Likes in selected period" },
     { label: "Comments", value: comments, icon: MessageCircle, note: "Comments in selected period" },
     { label: "Shares", value: metrics.shares, icon: Share2, note: "Shares tracked from ZeeChat" },
@@ -178,7 +181,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
           </article>
           <div className="analytics-range-row"><div><b>Performance overview</b><span>Choose a time range for views and watch activity</span></div><div className="analytics-range-switch" aria-label="Analytics time range">{([7, 30, 90] as const).map(value => <button type="button" key={value} className={range === value ? "is-active" : ""} aria-pressed={range === value} onClick={() => setRange(value)}>{value}d</button>)}</div></div>
           {error && <div className="analytics-error" role="alert">{error}</div>}
-          <div className="analytics-metric-grid">{cards.map(card => { const Icon = card.icon; return <article className="analytics-metric-card" key={card.label}><div className="analytics-metric-top"><span>{card.label}</span><Icon size={17}/></div><b>{loading ? "—" : numberFormat(card.value)}</b><small>{card.note}</small></article>; })}</div>
+          <div className="analytics-metric-grid">{cards.map(card => { const Icon = card.icon; return <article className="analytics-metric-card" key={card.label}><div className="analytics-metric-top"><span>{card.label}</span><Icon size={17}/></div><b>{loading || (card.label === "Unique viewers" && !viewHistoryAvailable) ? "—" : numberFormat(card.value)}</b><small>{card.note}</small></article>; })}</div>
           <article className="analytics-chart-card"><header><div><b>Views over time</b><span>Daily view activity</span></div><strong><Eye size={15}/>{loading ? "—" : numberFormat(metrics.views)}</strong></header>
             <div className="analytics-chart-wrap">
               {loading ? <div className="analytics-chart-loading"><span/><span/><span/><span/><span/><span/><span/></div> : trend.some(day => day.count > 0) ? <svg viewBox="0 0 300 112" role="img" aria-label={"Views trend for the last " + range + " days"} preserveAspectRatio="none"><defs><linearGradient id="reel-analytics-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#ff6ba6" stopOpacity=".32"/><stop offset="100%" stopColor="#a88bff" stopOpacity="0"/></linearGradient></defs><path d={chart.path + " L294 100 L6 100 Z"} fill="url(#reel-analytics-fill)"/><path d={chart.path} fill="none" stroke="#ff6ba6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>{chart.points.filter((_, index) => index === chart.points.length - 1 || trend[ index ].count > 0 && index % Math.max(1, Math.floor(range / 7)) === 0).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="3" fill="#f9e4f0" stroke="#ff6ba6" strokeWidth="1.5"/>)}</svg> : <div className="analytics-chart-empty"><ChartNoAxesCombined size={24}/><b>{metrics.views > 0 ? "Detailed view history unavailable" : "No views in this period yet"}</b><span>{metrics.views > 0 ? "Daily trends appear after the analytics update is enabled." : "Share your Reel to help it find its audience."}</span></div>}
