@@ -1824,6 +1824,10 @@ export default function HomePage() {
     if (editorAudioRef.current) editorAudioRef.current.volume = musicVolume / 100;
   }, [musicVolume, audioPreviewUrl, selectedSound]);
 
+  useEffect(() => {
+    if (editorVideoRef.current) editorVideoRef.current.volume = originalVolume / 100;
+  }, [originalVolume, mediaFile]);
+
   async function publish() {
     if ((selectedSound || audioFile) && (!mediaFile || !mediaFile.type.startsWith("video/"))) { setNotice("Choose a video for your sound Reel. Photos continue to publish to Home without added music."); return; }
     if (!caption.trim() && !mediaFile) return;
