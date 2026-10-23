@@ -2418,3 +2418,10 @@ body {
  .analytics-watch-grid>article>small{grid-column:1/-1}
 }
 @media(prefers-reduced-motion:reduce){.reel-analytics-backdrop,.analytics-chart-loading span{animation:none}.analytics-metric-card,.analytics-range-switch button{transition:none}}
+
+
+.analytics-export-button{display:flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 13px;border:1px solid #ff6ba642;border-radius:12px;background:linear-gradient(120deg,#ff6ba618,#a88bff15);color:#f0c1e5;font-size:11px;font-weight:800;transition:background .16s ease,border-color .16s ease}
+.analytics-export-button:hover:not(:disabled){background:linear-gradient(120deg,#ff6ba62b,#a88bff28);border-color:#ff6ba677}
+.analytics-export-button:disabled{opacity:.45;cursor:wait}
+.analytics-export-button:focus-visible{outline:2px solid #ff9dc8;outline-offset:3px}
+@media(max-width:700px){.analytics-export-button{margin-left:auto;min-width:38px;padding:0 10px}.analytics-export-button span{display:none}}
