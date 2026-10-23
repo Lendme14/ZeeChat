@@ -17,6 +17,7 @@ const dateLabel = (value: Date, compact = false) => value.toLocaleDateString([],
 export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanelProps) {
   const [range, setRange] = useState<7 | 30 | 90>(30);
   const [views, setViews] = useState<ViewRow[]>([]);
+  const [totalViews, setTotalViews] = useState(0);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [likes, setLikes] = useState(0);
   const [comments, setComments] = useState(0);
@@ -33,14 +34,15 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     void (async () => {
       try {
         const [viewResult, eventResult, likeResult, commentResult] = await Promise.all([
-          client.from("zeechat_post_views").select("viewed_at,viewer_id").eq("post_id", post.id).gte("viewed_at", since).order("viewed_at", { ascending: true }).limit(10000),
+          client.from("zeechat_post_views").select("viewed_at,viewer_id", { count: "exact" }).eq("post_id", post.id).gte("viewed_at", since).order("viewed_at", { ascending: true }).limit(10000),
           client.from("zeechat_reel_analytics_events").select("event_type,watch_seconds,completion_pct,created_at").eq("post_id", post.id).gte("created_at", since).limit(10000),
-          client.from("zeechat_post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", post.id),
-          client.from("zeechat_comments").select("id", { count: "exact", head: true }).eq("post_id", post.id),
+          client.from("zeechat_post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", post.id).gte("created_at", since),
+          client.from("zeechat_comments").select("id", { count: "exact", head: true }).eq("post_id", post.id).gte("created_at", since),
         ]);
         if (!active) return;
         if (viewResult.error) throw viewResult.error;
         setViews((viewResult.data ?? []) as ViewRow[]);
+        setTotalViews(viewResult.count ?? (viewResult.data ?? []).length);
         if (eventResult.error) {
           setAdvancedAvailable(false);
           setEvents([]);
@@ -68,9 +70,10 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
     const saves = events.filter(event => event.event_type === "save").length;
     const avgWatch = watchEvents.length ? totalWatch / watchEvents.length : 0;
     const avgCompletion = watchEvents.length ? watchEvents.reduce((sum, event) => sum + Math.max(0, Number(event.completion_pct) || 0), 0) / watchEvents.length : 0;
-    const engagement = views.length ? ((likes + comments + saves) / views.length) * 100 : 0;
-    return { views: views.length, unique, totalWatch, completions, shares, saves, avgWatch, avgCompletion, engagement };
-  }, [views, events, likes, comments]);
+    const completionRate = watchEvents.length ? (completions / watchEvents.length) * 100 : 0;
+    const engagement = totalViews ? ((likes + comments + saves) / totalViews) * 100 : 0;
+    return { views: totalViews, unique, totalWatch, completions, shares, saves, avgWatch, completionRate, engagement };
+  }, [views, totalViews, events, likes, comments]);
 
   const trend = useMemo(() => {
     const days: { key: string; label: string; count: number }[] = [];
@@ -102,8 +105,8 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
   const cards = [
     { label: "Total views", value: metrics.views, icon: Eye, note: "Plays recorded in this period" },
     { label: "Unique viewers", value: metrics.unique, icon: Users, note: "Signed-in accounts reached" },
-    { label: "Likes", value: likes, icon: Heart, note: "Lifetime likes" },
-    { label: "Comments", value: comments, icon: MessageCircle, note: "Lifetime comments" },
+    { label: "Likes", value: likes, icon: Heart, note: "Likes in selected period" },
+    { label: "Comments", value: comments, icon: MessageCircle, note: "Comments in selected period" },
     { label: "Shares", value: metrics.shares, icon: Share2, note: "Shares tracked from ZeeChat" },
     { label: "Saves", value: metrics.saves, icon: Bookmark, note: "Saves tracked from ZeeChat" },
   ];
@@ -130,7 +133,7 @@ export default function ReelAnalyticsPanel({ post, onClose }: ReelAnalyticsPanel
             </div>
             <footer><span>{trend[0]?.label}</span><span>{trend[Math.floor(trend.length / 2)]?.label}</span><span>{trend[trend.length - 1]?.label}</span></footer>
           </article>
-          <div className="analytics-watch-grid"><article><div><Clock3 size={17}/><span>Average watch time</span></div><b>{advancedAvailable && !loading ? Math.floor(metrics.avgWatch / 60) + ":" + String(Math.floor(metrics.avgWatch % 60)).padStart(2, "0") : "—"}</b><small>Average per tracked play session</small></article><article><div><Sparkles size={17}/><span>Completion rate</span></div><b>{advancedAvailable && !loading ? metrics.avgCompletion.toFixed(1) + "%" : "—"}</b><small>{numberFormat(metrics.completions)} completed plays in this period</small></article><article><div><ArrowDownLeft size={17}/><span>Engagement rate</span></div><b>{loading ? "—" : metrics.engagement.toFixed(1) + "%"}</b><small>Likes, comments and tracked saves ÷ views</small></article></div>
+          <div className="analytics-watch-grid"><article><div><Clock3 size={17}/><span>Average watch time</span></div><b>{advancedAvailable && !loading ? Math.floor(metrics.avgWatch / 60) + ":" + String(Math.floor(metrics.avgWatch % 60)).padStart(2, "0") : "—"}</b><small>Average per tracked play session</small></article><article><div><Sparkles size={17}/><span>Completion rate</span></div><b>{advancedAvailable && !loading ? metrics.completionRate.toFixed(1) + "%" : "—"}</b><small>{numberFormat(metrics.completions)} completed plays in this period</small></article><article><div><ArrowDownLeft size={17}/><span>Engagement rate</span></div><b>{loading ? "—" : metrics.engagement.toFixed(1) + "%"}</b><small>Likes, comments and tracked saves ÷ views</small></article></div>
           {!advancedAvailable && <p className="analytics-data-note">Detailed watch time, completion, share and save insights will appear after the Reel analytics update is enabled.</p>}
           <p className="analytics-privacy-note">Analytics are visible only to you as the Reel owner. Views may include repeat plays; unique viewers count signed-in accounts.</p>
         </div>
