@@ -1585,7 +1585,7 @@ export default function HomePage() {
     const duration = Math.max(session.duration, reelDuration);
     const completionPct = duration > 0 ? Math.min(100, (session.maxTime / duration) * 100) : 0;
     void trackReelAnalyticsEvent(session.postId, "watch_session", seconds, completionPct);
-    if (completed || completionPct >= 95) void trackReelAnalyticsEvent(session.postId, "completion", seconds, 100);
+    if (completed) void trackReelAnalyticsEvent(session.postId, "completion", seconds, 100);
   }
 
   async function toggleSavedReel(postId: string) {
