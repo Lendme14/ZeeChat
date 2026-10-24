@@ -2108,7 +2108,7 @@ export default function HomePage() {
       let atmosphereCoordinates: { latitude: number; longitude: number } | null = null;
       if (makeReel && atmosphereLocationEnabled) {
         if (!navigator.geolocation) throw new Error("This browser cannot share a post location. Turn off the Atmosphere location option or use a supported browser.");
-        atmosphereCoordinates = await new Promise((resolve, reject) => {
+        atmosphereCoordinates = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
             position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
             () => reject(new Error("Location permission was not granted. Your Reel was not published with Atmosphere location. Allow location access or turn the option off and try again.")),
