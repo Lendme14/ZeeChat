@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { CloudRain, Sun, Sunrise, X } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 type Mode = "creator" | "viewer";
 type WeatherSnapshot = { code: number; isDay: boolean; precipitation: number; wind: number };
 
-export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enabled = true }: {
+export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enabled = true, userId }: {
   creatorLatitude?: number | null;
   creatorLongitude?: number | null;
   enabled?: boolean;
+  userId?: string | null;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [atmosphereEnabled, setAtmosphereEnabled] = useState(true);
@@ -17,16 +19,33 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     try {
       const enabledSaved = localStorage.getItem("zeechat-atmosphere-enabled");
       if (enabledSaved === "false") setAtmosphereEnabled(false);
       const saved = localStorage.getItem("zeechat-atmosphere-mode") as Mode | null;
       if (saved === "creator" || saved === "viewer") setMode(saved);
       else setShowPicker(true);
-      const disabled = localStorage.getItem("zeechat-atmosphere-enabled");
-      if (disabled === "false") setShowPicker(false);
+      if (enabledSaved === "false") setShowPicker(false);
     } catch { setShowPicker(true); }
-  }, []);
+
+    if (userId) {
+      void createClient().from("zeechat_atmosphere_preferences")
+        .select("enabled,mode").eq("user_id", userId).maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelled || error || !data) return;
+          const savedMode = data.mode === "creator" || data.mode === "viewer" ? data.mode : "viewer";
+          setMode(savedMode);
+          setAtmosphereEnabled(data.enabled !== false);
+          try {
+            localStorage.setItem("zeechat-atmosphere-mode", savedMode);
+            localStorage.setItem("zeechat-atmosphere-enabled", String(data.enabled !== false));
+          } catch {}
+          if (!data.enabled) setShowPicker(false);
+        });
+    }
+    return () => { cancelled = true; };
+  }, [userId]);
 
   useEffect(() => {
     if (!enabled || !atmosphereEnabled || !mode) return;
@@ -86,9 +105,22 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   const cloudy = Boolean(weather && [1, 2, 3, 45, 48].includes(weather.code));
   const night = Boolean(weather && !weather.isDay);
   const effect = rain || storm ? "rain" : night ? "night" : cloudy ? "cloud" : "sun";
+  const savePreference = (nextMode: Mode, nextEnabled: boolean) => {
+    try {
+      localStorage.setItem("zeechat-atmosphere-mode", nextMode);
+      localStorage.setItem("zeechat-atmosphere-enabled", String(nextEnabled));
+    } catch {}
+    if (userId) {
+      void createClient().from("zeechat_atmosphere_preferences").upsert({
+        user_id: userId, mode: nextMode, enabled: nextEnabled, updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" }).then(({ error }) => {
+        if (error) console.warn("Atmosphere preference could not be synced to the account", error);
+      });
+    }
+  };
   const choose = (next: Mode) => {
-    setMode(next); setShowPicker(false);
-    try { localStorage.setItem("zeechat-atmosphere-mode", next); localStorage.setItem("zeechat-atmosphere-enabled", "true"); } catch {}
+    setMode(next); setAtmosphereEnabled(true); setShowPicker(false);
+    savePreference(next, true);
   };
 
   return <>
@@ -98,7 +130,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
       {!rain && !night && <span className="zee-atmosphere-sun">☼</span>}
       <button type="button" className="zee-atmosphere-switch" aria-label="Change atmosphere mode" title="Change atmosphere mode" onClick={() => setShowPicker(true)}><CloudRain size={15}/><span>{mode === "creator" ? "Creator" : "My weather"}</span></button>
     </div>}
-    {!showPicker && mode && <button type="button" className="zee-atmosphere-toggle" aria-pressed={atmosphereEnabled} onClick={() => { const next = !atmosphereEnabled; setAtmosphereEnabled(next); try { localStorage.setItem("zeechat-atmosphere-enabled", String(next)); } catch {} if (next && !weather) setShowPicker(true); }} title={atmosphereEnabled ? "Turn Atmosphere off" : "Turn Atmosphere on"}>{atmosphereEnabled ? "Atmosphere on" : "Atmosphere off"}</button>}
+    {!showPicker && mode && <button type="button" className="zee-atmosphere-toggle" aria-pressed={atmosphereEnabled} onClick={() => { const next = !atmosphereEnabled; setAtmosphereEnabled(next); if (mode) savePreference(mode, next); if (next && !weather) setShowPicker(true); }} title={atmosphereEnabled ? "Turn Atmosphere off" : "Turn Atmosphere on"}>{atmosphereEnabled ? "Atmosphere on" : "Atmosphere off"}</button>}
     {showPicker && <div className="zee-atmosphere-backdrop" role="presentation">
       <section className="zee-atmosphere-modal" role="dialog" aria-modal="true" aria-labelledby="zee-atmosphere-title">
         <button className="zee-atmosphere-close" type="button" onClick={() => setShowPicker(false)} aria-label="Close"><X size={18}/></button>
