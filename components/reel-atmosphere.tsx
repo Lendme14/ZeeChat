@@ -31,6 +31,9 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   useEffect(() => {
     if (!enabled || !atmosphereEnabled || !mode) return;
     let cancelled = false;
+    let refreshTimer: ReturnType<typeof setInterval> | undefined;
+    let locationWatch: ReturnType<typeof setTimeout> | undefined;
+
     const load = async (latitude: number, longitude: number) => {
       try {
         const url = new URL("https://api.open-meteo.com/v1/forecast");
@@ -39,7 +42,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
           current: "weather_code,is_day,precipitation,wind_speed_10m",
           timezone: "auto",
         }).toString();
-        const response = await fetch(url.toString());
+        const response = await fetch(url.toString(), { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         if (!cancelled && data.current) setWeather({
@@ -51,16 +54,31 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
       } catch { /* Weather is decorative: never interrupt video playback. */ }
     };
 
-    if (mode === "creator" && Number.isFinite(creatorLatitude) && Number.isFinite(creatorLongitude)) {
-      void load(creatorLatitude as number, creatorLongitude as number);
-    } else if (mode === "viewer" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        position => { if (!cancelled) { const next = { latitude: position.coords.latitude, longitude: position.coords.longitude }; void load(next.latitude, next.longitude); } },
-        () => { if (!cancelled) setWeather(null); },
-        { maximumAge: 300000, timeout: 7000, enableHighAccuracy: false },
-      );
-    }
-    return () => { cancelled = true; };
+    const refresh = () => {
+      if (mode === "creator") {
+        if (Number.isFinite(creatorLatitude) && Number.isFinite(creatorLongitude)) {
+          void load(creatorLatitude as number, creatorLongitude as number);
+        } else {
+          setWeather(null);
+        }
+      } else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          position => { if (!cancelled) void load(position.coords.latitude, position.coords.longitude); },
+          () => { if (!cancelled) setWeather(null); },
+          { maximumAge: 300000, timeout: 7000, enableHighAccuracy: false },
+        );
+      } else {
+        setWeather(null);
+      }
+    };
+
+    refresh();
+    refreshTimer = setInterval(refresh, 15 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      if (refreshTimer) clearInterval(refreshTimer);
+      if (locationWatch) clearTimeout(locationWatch);
+    };
   }, [enabled, atmosphereEnabled, mode, creatorLatitude, creatorLongitude]);
 
   const rain = Boolean(weather && (weather.precipitation > 0 || (weather.code >= 51 && weather.code <= 82)));
