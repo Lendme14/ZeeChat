@@ -612,7 +612,7 @@ export default function HomePage() {
           following: creatorFollowing.error ? 0 : (creatorFollowing.count ?? 0)
         });
         const { data: creatorPosts, error: postsError } = await supabase.from("zeechat_posts")
-          .select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,media_path,thumbnail_path,is_reel")
+          .select("id,caption,created_at,author_id,post_type,media_url,thumbnail_url,media_path,thumbnail_path,is_reel,atmosphere_location_enabled,atmosphere_latitude,atmosphere_longitude,atmosphere_location_label")
           .eq("author_id", creator.user_id).in("visibility", ["public", "followers"])
           .order("created_at", { ascending: false }).limit(60);
         if (postsError) throw postsError;
