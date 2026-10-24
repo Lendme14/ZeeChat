@@ -129,6 +129,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
       <button type="button" className="zee-atmosphere-switch" aria-label="Change atmosphere mode" title="Change atmosphere mode" onClick={() => setShowPicker(true)}><CloudRain size={15}/><span>{mode === "creator" ? "Creator" : "My weather"}</span></button>
     </div>}
     {!showPicker && mode && <button type="button" className="zee-atmosphere-toggle" aria-pressed={atmosphereEnabled} onClick={() => { const next = !atmosphereEnabled; setAtmosphereEnabled(next); if (mode) savePreference(mode, next); if (next && !weather) setShowPicker(true); }} title={atmosphereEnabled ? "Turn Atmosphere off" : "Turn Atmosphere on"}>{atmosphereEnabled ? "Atmosphere on" : "Atmosphere off"}</button>}
+    {!showPicker && !mode && <button type="button" className="zee-atmosphere-toggle" onClick={() => setShowPicker(true)}>Set up Atmosphere</button>}
     {showPicker && <div className="zee-atmosphere-backdrop" role="presentation">
       <section className="zee-atmosphere-modal" role="dialog" aria-modal="true" aria-labelledby="zee-atmosphere-title">
         <button className="zee-atmosphere-close" type="button" onClick={() => setShowPicker(false)} aria-label="Close"><X size={18}/></button>
