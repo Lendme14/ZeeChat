@@ -50,8 +50,7 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
   useEffect(() => {
     if (!enabled || !atmosphereEnabled || !mode) return;
     let cancelled = false;
-    let refreshTimer: ReturnType<typeof setInterval> | undefined;
-    let locationWatch: ReturnType<typeof setTimeout> | undefined;
+    const refreshTimer = { current: undefined as ReturnType<typeof setInterval> | undefined };
 
     const load = async (latitude: number, longitude: number) => {
       try {
@@ -92,11 +91,10 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
     };
 
     refresh();
-    refreshTimer = setInterval(refresh, 15 * 60 * 1000);
+    refreshTimer.current = setInterval(refresh, 15 * 60 * 1000);
     return () => {
       cancelled = true;
-      if (refreshTimer) clearInterval(refreshTimer);
-      if (locationWatch) clearTimeout(locationWatch);
+      if (refreshTimer.current) clearInterval(refreshTimer.current);
     };
   }, [enabled, atmosphereEnabled, mode, creatorLatitude, creatorLongitude]);
 
@@ -138,8 +136,8 @@ export default function ReelAtmosphere({ creatorLatitude, creatorLongitude, enab
         <p className="zee-atmosphere-eyebrow">ZEECHAT EXPERIENCE</p>
         <h2 id="zee-atmosphere-title">Choose your atmosphere</h2>
         <p>Live conditions shape subtle effects while you watch. Your video stays unchanged.</p>
-        <button className={"zee-atmosphere-option " + (mode === "creator" ? "is-selected" : "")} type="button" onClick={() => choose("creator")}><span className="zee-atmosphere-option-icon"><Sun size={21}/></span><span><b>Creator's weather</b><small>Live conditions at the creator's saved post location</small></span></button>
-        <button className={"zee-atmosphere-option " + (mode === "viewer" ? "is-selected" : "")} type="button" onClick={() => choose("viewer")}><span className="zee-atmosphere-option-icon"><Sunrise size={21}/></span><span><b>My local weather</b><small>Live conditions where you're watching; location permission may be requested</small></span></button>
+        <button className={"zee-atmosphere-option " + (mode === "creator" ? "is-selected" : "")} type="button" onClick={() => choose("creator")}><span className="zee-atmosphere-option-icon"><Sun size={21}/></span><span><b>Creator&apos;s weather</b><small>Live conditions at the creator&apos;s saved post location</small></span></button>
+        <button className={"zee-atmosphere-option " + (mode === "viewer" ? "is-selected" : "")} type="button" onClick={() => choose("viewer")}><span className="zee-atmosphere-option-icon"><Sunrise size={21}/></span><span><b>My local weather</b><small>Live conditions where you&apos;re watching; location permission may be requested</small></span></button>
         <p className="zee-atmosphere-footnote">Weather data may be approximate or delayed. If unavailable, the Reel plays normally.</p>
       </section>
     </div>}
